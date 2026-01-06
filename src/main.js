@@ -339,11 +339,11 @@ function buildAndInitScene(notes) {
   }
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambientLight);
+  pianoGroup.add(ambientLight);
 
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(3, 6, 3);
-  scene.add(directionalLight);
+  directionalLight.position.set(3, 6, -3);
+  pianoGroup.add(directionalLight);
 
   window.addEventListener("resize", onWindowResize, false);
 
