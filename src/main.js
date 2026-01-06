@@ -8,6 +8,7 @@ import {
   isAudioReady,
   fadeOutAndDisconnect,
 } from "./audio.js";
+import { parseMelodyFromURL, calculateTempoAndQuantize } from "./melody.js";
 
 const scene = new THREE.Scene();
 const pianoGroup = new THREE.Group();
@@ -48,6 +49,14 @@ const highlightMaterial = new THREE.MeshStandardMaterial({
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 
+// --- State variables for recording ---
+let isRecording = false;
+let recordedNotes = [];
+let silenceTimeout = null;
+let recordedMelody = "";
+let recordedTempo = 120;
+const SILENCE_THRESHOLD = 2000; // 2 seconds
+
 // --- State variables to be initialized in buildAndInitScene ---
 let keyState,
   activePointers,
@@ -56,51 +65,6 @@ let keyState,
   raycaster,
   unhighlightKey,
   advancePlayMode;
-
-function parseMelodyFromURL() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const melodyParam = urlParams.get("melody");
-  if (!melodyParam) return [];
-
-  const tempo = parseFloat(urlParams.get("tempo")) || 120;
-  const beatDuration = 60 / tempo;
-
-  const notes = melodyParam.split(",");
-  let currentTime = 0; // in beats
-  const parsedMelody = [];
-
-  const noteRegex = /^([0-9\.]+)(.+)/; // Catches leading number and the rest.
-
-  for (const noteString of notes) {
-    if (!noteString) continue;
-
-    const match = noteString.match(noteRegex);
-    if (!match) continue;
-
-    const durationInBeats = parseFloat(match[1]);
-    let noteName = match[2];
-
-    if (isNaN(durationInBeats)) continue;
-
-    const firstChar = noteName.charAt(0);
-    if (firstChar >= "a" && firstChar <= "g") {
-      const rest = noteName.slice(1);
-      noteName = `${firstChar.toUpperCase()}#${rest}`;
-    } else if (noteName === "R" || noteName === "_") {
-      noteName = "REST";
-    }
-
-    parsedMelody.push({
-      note: noteName,
-      duration: durationInBeats * beatDuration,
-      start: currentTime * beatDuration,
-    });
-
-    currentTime += durationInBeats;
-  }
-
-  return parsedMelody;
-}
 
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
@@ -144,6 +108,30 @@ function getNoteFromObject(object) {
   return noteMap.get(object);
 }
 
+function startRecording() {
+  if (melody.length > 0) return;
+  isRecording = true;
+  recordedNotes = [];
+  console.log("Recording started");
+  document.getElementById("share-container").style.display = "none";
+}
+
+function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+  console.log("Recording stopped");
+
+  if (recordedNotes.length < 2) return;
+
+  const { melody, tempo } = calculateTempoAndQuantize(recordedNotes);
+  recordedMelody = melody;
+  recordedTempo = tempo;
+
+  const shareContainer = document.getElementById("share-container");
+  shareContainer.style.display = "block";
+  shareContainer.style.opacity = "1";
+}
+
 function pressKey(hitbox, pointerId, playAudio = true) {
   const renderKey = hitboxMap.get(hitbox);
   if (!keyState.has(hitbox) || keyState.get(hitbox).size === 0) {
@@ -155,6 +143,16 @@ function pressKey(hitbox, pointerId, playAudio = true) {
 
   const note = getNoteFromObject(hitbox);
   if (note) {
+    if (melody.length === 0 && !isRecording) {
+      startRecording();
+    }
+
+    if (isRecording) {
+      clearTimeout(silenceTimeout);
+      const now = Date.now();
+      recordedNotes.push({ note: note, startTime: now, endTime: 0 });
+    }
+
     if (
       playbackState === "PLAY" &&
       melody.length > 0 &&
@@ -192,6 +190,18 @@ function releaseKey(hitbox, pointerId, stopAudio = true) {
     if (pointers.size === 0) {
       renderKey.position.y += 0.2;
       keyState.delete(hitbox);
+
+      if (isRecording) {
+        const note = getNoteFromObject(hitbox);
+        const noteToUpdate = recordedNotes.find(
+          (n) => n.note === note && n.endTime === 0,
+        );
+        if (noteToUpdate) {
+          noteToUpdate.endTime = Date.now();
+        }
+        clearTimeout(silenceTimeout);
+        silenceTimeout = setTimeout(stopRecording, SILENCE_THRESHOLD);
+      }
 
       if (stopAudio) {
         const noteGainNode = activeNoteGainNodes.get(hitbox);
@@ -414,6 +424,15 @@ function buildAndInitScene(notes) {
   renderer.domElement.addEventListener("touchend", onPointerUp, false);
   renderer.domElement.addEventListener("touchmove", onPointerMove, false);
   renderer.domElement.addEventListener("touchcancel", onPointerUp, false);
+
+  document.getElementById("share-button").addEventListener("click", (e) => {
+    e.preventDefault();
+    const url = new URL(window.location.href);
+    url.searchParams.set("melody", recordedMelody);
+    url.searchParams.set("tempo", recordedTempo);
+    const finalUrl = url.href.replace(/%2C/g, ",");
+    window.open(finalUrl, "_blank");
+  });
 
   animate();
 }
