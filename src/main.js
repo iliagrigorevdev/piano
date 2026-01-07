@@ -46,6 +46,11 @@ const highlightMaterial = new THREE.MeshStandardMaterial({
   roughness: 0.2,
   metalness: 0.1,
 });
+const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffae5e,
+  roughness: 0.2,
+  metalness: 0.1,
+});
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 
@@ -63,8 +68,7 @@ let keyState,
   activeNoteGainNodes,
   hitboxKeys,
   raycaster,
-  unhighlightKey,
-  advancePlayMode;
+  unhighlightKey;
 
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
@@ -160,9 +164,16 @@ function pressKey(hitbox, pointerId, playAudio = true) {
       note === melody[currentNoteIndex].note
     ) {
       const playedNoteInfo = melody[currentNoteIndex];
-      unhighlightKey(playedNoteInfo.note);
+      const renderKey = hitboxMap.get(hitbox);
+      if (renderKey) {
+        renderKey.material = pressedHighlightMaterial;
+      }
+
       currentNoteIndex++;
-      setTimeout(advancePlayMode, playedNoteInfo.duration * 1000);
+      setTimeout(() => {
+        unhighlightKey(note);
+        advancePlayMode();
+      }, playedNoteInfo.duration * 1000);
     }
 
     if (playAudio) {
@@ -479,12 +490,16 @@ function playMelody() {
       setTimeout(() => playNoteAtIndex(index + 1), delay);
     } else {
       // This is the last note, schedule transition to PLAY mode
-      setTimeout(() => {
-        console.log("Demo finished. Starting play mode.");
-        playbackState = "PLAY";
-        isDemoPlaying = false;
-        startPlayMode();
-      }, noteInfo.duration * 1000);
+      const pauseBeforePlayMode = 500; // ms
+      setTimeout(
+        () => {
+          console.log("Demo finished. Starting play mode.");
+          playbackState = "PLAY";
+          isDemoPlaying = false;
+          startPlayMode();
+        },
+        noteInfo.duration * 1000 + pauseBeforePlayMode,
+      );
     }
   }
 
@@ -499,11 +514,11 @@ function startPlayMode() {
   }
 }
 
-advancePlayMode = function () {
+function advancePlayMode() {
   if (currentNoteIndex >= melody.length) {
     console.log("Melody finished! Restarting demo.");
     playbackState = "DEMO";
-    setTimeout(playMelody, 2000);
+    setTimeout(playMelody, 1000);
     return;
   }
 
@@ -515,7 +530,7 @@ advancePlayMode = function () {
   } else {
     highlightKey(noteInfo.note);
   }
-};
+}
 
 function highlightKey(noteToHighlight) {
   for (const [hitbox, noteName] of noteMap.entries()) {
