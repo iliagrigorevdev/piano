@@ -28,6 +28,15 @@ canvas {
   transition: opacity 0.3s ease-in-out;
 }
 
+@media (orientation: portrait) {
+  #share-container {
+    left: auto;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+  }
+}
+
 #share-button {
   cursor: pointer;
   display: block;
