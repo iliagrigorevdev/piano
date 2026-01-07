@@ -466,7 +466,7 @@ function playMelody() {
     const noteInfo = melody[index];
 
     // Play sound and highlight
-    if (noteInfo.note !== "REST") {
+    if (noteInfo.note !== "_") {
       const hitbox = noteToHitboxMap.get(noteInfo.note);
       if (hitbox) {
         pressKey(hitbox, "demo", false);
@@ -523,7 +523,7 @@ function advancePlayMode() {
   }
 
   const noteInfo = melody[currentNoteIndex];
-  if (noteInfo.note === "REST") {
+  if (noteInfo.note === "_") {
     // Automatically skip rests
     currentNoteIndex++;
     setTimeout(advancePlayMode, noteInfo.duration * 1000);

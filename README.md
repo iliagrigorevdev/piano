@@ -29,7 +29,7 @@ You can load a custom melody by providing it as a URL parameter. The format is a
 
 - `melody`: A comma-separated list of notes.
   - `duration`: The duration of the note in beats (e.g., `4`, `1`, `0.5`).
-  - `note`: The note name (e.g., `C4`, `d5`). Lowercase letters (e.g., `a`, `c`, `d`) denote sharp notes (e.g., `A#`, `C#`, `D#`). Use `_` or `R` for rests. The available note range is from F3 to E5.
+  - `note`: The note name (e.g., `C4`, `d5`). Lowercase letters (e.g., `a`, `c`, `d`) denote sharp notes (e.g., `A#`, `C#`, `D#`). Use `_` for rests. The available note range is from F3 to E5.
 - `tempo`: The tempo of the melody in beats per minute (BPM). Defaults to 120.
 
 **Example:**

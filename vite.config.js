@@ -1,5 +1,9 @@
-import { defineConfig } from "vite";
+/// <reference types="vitest" />
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   base: "/piano/",
+  test: {
+    globals: true,
+  },
 });

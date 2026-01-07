@@ -27,8 +27,6 @@ function parseMelodyFromURL() {
     if (firstChar >= "a" && firstChar <= "g") {
       const rest = noteName.slice(1);
       noteName = `${firstChar.toUpperCase()}#${rest}`;
-    } else if (noteName === "R" || noteName === "_") {
-      noteName = "REST";
     }
 
     parsedMelody.push({
