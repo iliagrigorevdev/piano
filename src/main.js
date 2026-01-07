@@ -320,7 +320,7 @@ function buildAndInitScene(notes) {
     } else {
       // Black key
       const rootNoteLetter = noteNameWithoutOctave.charAt(0); // e.g., 'C' from 'C#'
-      const precedingWhiteNote = rootNoteLetter + octave; // e.g., "F3" for "F#3"
+      const precedingWhiteNoteName = rootNoteLetter + octave; // e.g., "F3" for "F#3"
 
       const renderMaterial = new THREE.MeshStandardMaterial({
         color: 0x222222,
@@ -333,7 +333,7 @@ function buildAndInitScene(notes) {
       hitboxKey = new THREE.Mesh(blackKeyHitboxGeometry, hitboxMaterial);
 
       // Calculate black key position relative to its preceding white key
-      const precedingWhiteKeyX = whiteKeyXPositions.get(precedingWhiteNote);
+      const precedingWhiteKeyX = whiteKeyXPositions.get(precedingWhiteNoteName);
       renderKey.position.x = precedingWhiteKeyX + 0.5;
       renderKey.position.y = 0.5;
       renderKey.position.z = -0.5;
