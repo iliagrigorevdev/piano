@@ -42,11 +42,11 @@ function parseMelodyFromURL() {
 }
 
 function calculateTempoAndQuantize(notes) {
-  // 1. Calculate Inter-Onset Intervals (IOIs)
+  // 1. Calculate Inter-Onset Intervals (IOIs) in milliseconds
   const iois = [];
   for (let i = 0; i < notes.length - 1; i++) {
-    const ioi = (notes[i + 1].startTime - notes[i].startTime) / 1000;
-    if (ioi > 0.05) {
+    const ioi = notes[i + 1].startTime - notes[i].startTime;
+    if (ioi > 50) {
       // Ignore very short IOIs
       iois.push(ioi);
     }
@@ -56,64 +56,100 @@ function calculateTempoAndQuantize(notes) {
     return { melody: "", tempo: 120 }; // Fallback
   }
 
-  // 2. Find the most common IOI using a histogram
-  const histogram = {};
-  const binSize = 0.02; // 20ms bins
-  let maxCount = 0;
-  let dominantIOI = iois[0];
+  // 2. Find clusters of IOIs
+  const clusters = findIOIClusters(iois);
 
-  for (const ioi of iois) {
-    const bin = Math.round(ioi / binSize) * binSize;
-    histogram[bin] = (histogram[bin] || 0) + 1;
-    if (histogram[bin] > maxCount) {
-      maxCount = histogram[bin];
-      dominantIOI = bin;
-    }
+  // 3. Find the quantum interval (greatest common divisor of cluster means)
+  const quantum = findQuantum(
+    clusters.map((c) => c.mean),
+    25,
+  ); // 25ms tolerance
+
+  if (quantum <= 0) {
+    return { melody: "", tempo: 120 }; // Fallback
   }
 
-  // 3. Calculate tempo
-  // Assume the dominant IOI is a quarter note, but constrain tempo
-  let tempo = 60 / dominantIOI;
-  if (tempo > 180) tempo /= 2; // Probably an 8th note
-  if (tempo < 70) tempo *= 2; // Probably a half note
+  // 4. Calculate tempo
+  const possibleTempos = [
+    60000 / (quantum * 4), // quantum is 16th note
+    60000 / (quantum * 2), // quantum is 8th note
+    60000 / quantum, // quantum is quarter note
+  ];
+
+  let tempo = possibleTempos.sort(
+    (a, b) => Math.abs(a - 120) - Math.abs(b - 120),
+  )[0];
   tempo = Math.round(tempo);
 
-  // 4. Quantize melody to this tempo
-  const beatDuration = 60 / tempo;
+  // 5. Quantize melody
+  const beatDuration = 60000 / tempo;
   let quantizedMelody = "";
   for (let i = 0; i < notes.length; i++) {
     const note = notes[i];
-    let durationInSeconds;
+    let duration;
 
     if (i < notes.length - 1) {
-      // For all notes except the last, duration is the time until the next note starts.
-      durationInSeconds = (notes[i + 1].startTime - note.startTime) / 1000;
+      duration = notes[i + 1].startTime - note.startTime;
     } else {
-      // For the last note, use its natural duration.
-      durationInSeconds = (note.endTime - note.startTime) / 1000;
+      duration = note.endTime - note.startTime;
     }
 
-    // Quantize to nearest 8th note (0.5 of a beat)
-    let durationInBeats = durationInSeconds / beatDuration;
-    durationInBeats = Math.max(0.25, Math.round(durationInBeats * 2) / 2);
+    // Quantize to nearest 16th note (0.25 of a beat)
+    let durationInBeats = duration / beatDuration;
+    durationInBeats = Math.max(0.25, Math.round(durationInBeats * 4) / 4);
     let formattedNoteName = note.note;
-    // Check if the note is a sharp note (e.g., "C#4")
     if (formattedNoteName.length > 1 && formattedNoteName.charAt(1) === "#") {
-      // Convert 'C#4' to 'c4', 'D#5' to 'd5', etc.
-      // The first character (e.g., 'C') becomes lowercase (e.g., 'c')
-      // The '#' is removed, and the rest of the string (e.g., '4') is appended.
       formattedNoteName =
         formattedNoteName.charAt(0).toLowerCase() + formattedNoteName.slice(2);
     }
 
-    quantizedMelody += `${
-      Number.isInteger(durationInBeats)
-        ? String(durationInBeats)
-        : durationInBeats.toFixed(2)
-    }${formattedNoteName},`;
+    quantizedMelody += `${durationInBeats.toFixed(2)}${formattedNoteName},`;
   }
 
   return { melody: quantizedMelody, tempo: tempo };
+}
+
+function findIOIClusters(iois, tolerance = 0.2) {
+  iois.sort((a, b) => a - b);
+  const clusters = [];
+  if (iois.length === 0) return clusters;
+
+  let currentCluster = { mean: iois[0], values: [iois[0]] };
+
+  for (let i = 1; i < iois.length; i++) {
+    if (iois[i] <= currentCluster.mean * (1 + tolerance)) {
+      currentCluster.values.push(iois[i]);
+      // Update mean
+      currentCluster.mean =
+        currentCluster.values.reduce((a, b) => a + b, 0) /
+        currentCluster.values.length;
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = { mean: iois[i], values: [iois[i]] };
+    }
+  }
+  clusters.push(currentCluster);
+  return clusters;
+}
+
+function findQuantum(numbers, tolerance) {
+  if (numbers.length === 0) return 0;
+  let result = numbers[0];
+  for (let i = 1; i < numbers.length; i++) {
+    result = pairGcd(numbers[i], result, tolerance);
+  }
+  return result;
+}
+
+function pairGcd(a, b, tolerance) {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b > tolerance) {
+    const temp = b;
+    b = a % b;
+    a = temp;
+  }
+  return a;
 }
 
 export { parseMelodyFromURL, calculateTempoAndQuantize };
