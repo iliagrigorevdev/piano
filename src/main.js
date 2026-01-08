@@ -218,7 +218,7 @@ function releaseKey(hitbox, pointerId, stopAudio = true) {
         const noteGainNode = activeNoteGainNodes.get(hitbox);
         if (noteGainNode) {
           activeNoteGainNodes.delete(hitbox);
-          fadeOutAndDisconnect(noteGainNode, 0.2);
+          fadeOutAndDisconnect(noteGainNode, 1);
         }
       }
     }
@@ -476,7 +476,7 @@ function playMelody() {
       const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
       setTimeout(() => {
         unhighlightKey(noteInfo.note);
-        if (gainNode) fadeOutAndDisconnect(gainNode, 0.1);
+        if (gainNode) fadeOutAndDisconnect(gainNode, 1);
         if (hitbox) {
           releaseKey(hitbox, "demo", false);
         }

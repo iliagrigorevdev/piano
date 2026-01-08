@@ -80,61 +80,101 @@ function generateNoteRange(startNote, endNote) {
   return generatedNotes;
 }
 
-// Map note names to frequencies
-let notes = {};
+function noteNameToMidi(note) {
+  const noteNameMatch = note.match(/([A-Ga-g]#?)/i);
+  const octaveMatch = note.match(/(\d+)/);
+  if (!noteNameMatch || !octaveMatch) {
+    return null;
+  }
+  const noteName = noteNameMatch[1].toUpperCase();
+  const octave = parseInt(octaveMatch[1], 10);
+  const noteIndex = ORDERED_NOTE_NAMES.indexOf(noteName);
 
-// Cache for AudioBuffers
+  if (noteIndex === -1) {
+    return null;
+  }
+
+  // MIDI note number: C0 = 12, C4 = 60
+  // ORDERED_NOTE_NAMES starts with C, so C is index 0
+  // C-1 (octave -1) is MIDI 0
+  // So, MIDI note = 12 * (octave + 1) + noteIndex
+  return 12 * (octave + 1) + noteIndex;
+}
+
+// SFZ data
+let regions = [];
 const cachedNoteBuffers = new Map();
 
-// Function to load and cache audio for a single note
-async function loadAndCacheNoteBuffer(note) {
-  const encodedNote = note.replace("#", "s");
-  const path = `samples/${encodedNote}.mp3`;
-  try {
-    const response = await fetch(path);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    cachedNoteBuffers.set(note, audioBuffer);
-  } catch (e) {
-    console.warn(`Could not load sound for ${note} at ${path}`);
+async function loadSfz(path) {
+  const response = await fetch(path);
+  const sfzText = await response.text();
+  const lines = sfzText.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.startsWith("<region>")) continue;
+    const parts = line.replace("<region>", "").trim().split(/\s+/);
+    const region = {};
+    for (const part of parts) {
+      const [key, value] = part.split("=");
+      // @ts-ignore
+      region[key] = isNaN(Number(value)) ? value : Number(value);
+    }
+    regions.push(region);
   }
 }
 
-// Function to cache all note sounds
-async function cacheAllNoteSounds(dynamicNotes = null) {
+async function cacheAllNoteSounds() {
   console.log("Caching note sounds...");
-  cachedNoteBuffers.clear(); // Clear existing cache
+  cachedNoteBuffers.clear();
+  await loadSfz("piano.sfz");
 
-  if (dynamicNotes) {
-    notes = dynamicNotes;
-  } else {
-    // Default range if none provided
-    notes = generateNoteRange("F3", "E5");
-  }
+  const samplePaths = [...new Set(regions.map((region) => region.sample))];
 
-  const cachePromises = [];
-  for (const note in notes) {
-    if (Object.prototype.hasOwnProperty.call(notes, note)) {
-      cachePromises.push(loadAndCacheNoteBuffer(note));
+  const cachePromises = samplePaths.map(async (path) => {
+    try {
+      const response = await fetch(path);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      cachedNoteBuffers.set(path, audioBuffer);
+    } catch (e) {
+      console.warn(`Could not load sound for ${path}`);
     }
-  }
+  });
+
   await Promise.all(cachePromises);
   console.log("Note sounds cached!");
-  return notes;
+
+  return generateNoteRange("F3", "E5");
 }
 
 function playNote(note) {
-  const cachedBuffer = cachedNoteBuffers.get(note);
+  const midiNote = noteNameToMidi(note);
+  if (!midiNote) {
+    return;
+  }
 
+  const region = regions.find(
+    (r) => midiNote >= r.lokey && midiNote <= r.hikey,
+  );
+
+  if (!region) {
+    console.warn(`No region found for MIDI note ${midiNote}`);
+    return;
+  }
+
+  const cachedBuffer = cachedNoteBuffers.get(region.sample);
   if (!cachedBuffer) {
     console.warn(
-      `Note buffer for ${note} not found in cache. This should not happen if caching is successful.`,
+      `Note buffer for ${region.sample} not found in cache. This should not happen if caching is successful.`,
     );
     return;
   }
 
   const source = audioContext.createBufferSource();
   source.buffer = cachedBuffer;
+
+  const pitchKeyCenter = region.pitch_keycenter || region.lokey;
+  const noteDifference = midiNote - pitchKeyCenter;
+  source.playbackRate.value = 2 ** (noteDifference / 12);
 
   const noteGainNode = audioContext.createGain();
   noteGainNode.connect(masterGainNode);
@@ -149,17 +189,15 @@ function isAudioReady() {
   return isAudioInitialized;
 }
 
-function fadeOutAndDisconnect(gainNode, fadeOutDuration = 0.1) {
+function fadeOutAndDisconnect(gainNode, fadeOutDuration) {
   if (!gainNode || !audioContext) return;
 
   gainNode.gain.cancelScheduledValues(audioContext.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(
-    0.0001,
+    0.001,
     audioContext.currentTime + fadeOutDuration,
   );
 
-  // Disconnect the node after the fade is complete.
-  // The timeout is slightly longer than the fade duration to ensure it has finished.
   const disconnectDelay = fadeOutDuration * 1000 + 50;
   setTimeout(() => gainNode.disconnect(), disconnectDelay);
 }

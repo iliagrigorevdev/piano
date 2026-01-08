@@ -73,3 +73,13 @@ npm run build
 ```
 
 This will create a `dist` folder with the bundled files, ready for deployment.
+
+## Sounds
+
+The piano sounds are from the Salamander Grand Piano V3 sample library by Alexander Holm, licensed under Creative Commons Attribution 3.0.
+
+You can find more information here: [https://archive.org/details/SalamanderGrandPianoV3](https://archive.org/details/SalamanderGrandPianoV3)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
