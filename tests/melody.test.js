@@ -17,7 +17,7 @@ describe("calculateTempoAndQuantize", () => {
     ];
     const { melody, tempo } = calculateTempoAndQuantize(notes);
     expect(tempo).toBe(120);
-    expect(melody).toBe("1.00C4,1.00D4,1.00E4,1.00F4,");
+    expect(melody).toBe("1C4,1D4,1E4,1F4,");
   });
 
   it("should handle a slightly faster melody", () => {
@@ -29,7 +29,7 @@ describe("calculateTempoAndQuantize", () => {
     ];
     const { melody, tempo } = calculateTempoAndQuantize(notes);
     expect(tempo).toBe(150);
-    expect(melody).toBe("1.00C4,1.00D4,1.00E4,1.00F4,");
+    expect(melody).toBe("1C4,1D4,1E4,1F4,");
   });
 
   it("should handle a melody with mixed durations", () => {
@@ -41,7 +41,7 @@ describe("calculateTempoAndQuantize", () => {
     ];
     const { melody, tempo } = calculateTempoAndQuantize(notes);
     expect(tempo).toBe(120);
-    expect(melody).toBe("1.00C4,0.50D4,0.50E4,1.00F4,");
+    expect(melody).toBe("1C4,0.50D4,0.50E4,1F4,");
   });
 
   it("should handle sharp notes", () => {
@@ -51,6 +51,6 @@ describe("calculateTempoAndQuantize", () => {
     ];
     const { melody, tempo } = calculateTempoAndQuantize(notes);
     expect(tempo).toBe(120);
-    expect(melody).toBe("1.00c4,1.00d4,");
+    expect(melody).toBe("1c4,1d4,");
   });
 });

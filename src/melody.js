@@ -103,7 +103,12 @@ function calculateTempoAndQuantize(notes) {
         formattedNoteName.charAt(0).toLowerCase() + formattedNoteName.slice(2);
     }
 
-    quantizedMelody += `${durationInBeats.toFixed(2)}${formattedNoteName},`;
+    const formattedDuration = durationInBeats.toFixed(2);
+    quantizedMelody += `${
+      formattedDuration.endsWith(".00")
+        ? String(parseInt(formattedDuration))
+        : formattedDuration
+    }${formattedNoteName},`;
   }
 
   return { melody: quantizedMelody, tempo: tempo };
