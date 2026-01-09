@@ -10,12 +10,18 @@ This is a web-based 3D piano application built with [Three.js](https://threejs.o
 
 - **3D Piano Model**: A fully interactive piano with 3D keys.
 - **Realistic Audio**: Uses the Web Audio API to generate realistic piano sounds.
-- **Custom Melodies**: Load your own melodies via URL parameters.
-- **Demo Mode**: The application can demonstrate a melody before you play.
+- **Multiple Play Modes**:
+  - **Free Play**: Play the piano without any constraints.
+  - **Melody Mode**: Load a melody via URL and play along with visual cues.
+  - **Recording Mode**: Record your own creations and share them with a unique link.
 - **Responsive Design**: The piano layout adapts to both landscape and portrait orientations.
 - **Touch and Mouse Support**: Play the piano with your mouse or on a touch-screen device.
 
 ## How to Play
+
+### Mode Switching
+
+To switch between **Free Play**, **Melody Mode**, and **Recording Mode**, press the following keys simultaneously: `F1`, `E3`, `F3`, and `E5`.
 
 ### Free Play
 
@@ -29,7 +35,7 @@ You can load a custom melody by providing it as a URL parameter. The format is a
 
 - `melody`: A comma-separated list of notes.
   - `duration`: The duration of the note in beats (e.g., `4`, `1`, `0.5`).
-  - `note`: The note name (e.g., `C4`, `d5`). Lowercase letters (e.g., `a`, `c`, `d`) denote sharp notes (e.g., `A#`, `C#`, `D#`). Use `_` for rests. The available note range is from F3 to E5.
+  - `note`: The note name (e.g., `C4`, `d5`). Lowercase letters (e.g., `a`, `c`, `d`) denote sharp notes (e.g., `A#`, `C#`, `D#`). Use `_` for rests. The available note range is from F1 to E5.
 - `tempo`: The tempo of the melody in beats per minute (BPM). Defaults to 120.
 
 **Example:**
@@ -37,6 +43,13 @@ You can load a custom melody by providing it as a URL parameter. The format is a
 `?melody=1C4,1D4,1E4,1F4,1G4,1A4,1B4,1C5&tempo=180`
 
 This will play a C major scale at 180 BPM.
+
+### Recording Mode
+
+1.  Switch to Recording Mode using the key combination mentioned above.
+2.  Start playing. The recording will begin automatically.
+3.  To stop, wait for 2 seconds of silence.
+4.  A share button will appear, allowing you to get a unique URL for your recorded melody.
 
 ## Development
 
