@@ -273,10 +273,28 @@ function handlePointerUp(pointerId) {
 }
 
 function buildAndInitScene(notes) {
-  const whiteKeyRenderGeometry = new RoundedBoxGeometry(1, 1, 5, 8, 0.08);
-  const blackKeyRenderGeometry = new RoundedBoxGeometry(0.6, 0.8, 3, 8, 0.05);
-  const whiteKeyHitboxGeometry = new THREE.BoxGeometry(1, 1, 5);
-  const blackKeyHitboxGeometry = new THREE.BoxGeometry(0.7, 0.8, 3);
+  const whiteKeyLength = 2.5;
+  const blackKeyLength = 1.25;
+  const whiteKeyRenderGeometry = new RoundedBoxGeometry(
+    1,
+    1,
+    whiteKeyLength,
+    8,
+    0.08,
+  );
+  const blackKeyRenderGeometry = new RoundedBoxGeometry(
+    0.6,
+    0.8,
+    blackKeyLength,
+    8,
+    0.05,
+  );
+  const whiteKeyHitboxGeometry = new THREE.BoxGeometry(1, 1, whiteKeyLength);
+  const blackKeyHitboxGeometry = new THREE.BoxGeometry(
+    0.7,
+    0.8,
+    blackKeyLength,
+  );
 
   hitboxMap = new Map(); // Maps hitbox to visible key
   noteMap = new Map(); // Maps hitbox to note
@@ -287,11 +305,26 @@ function buildAndInitScene(notes) {
   hitboxKeys = [];
 
   const allNoteNames = Object.keys(notes);
+  const middleIndex = Math.floor(allNoteNames.length / 2);
 
-  let whiteKeyRenderedCount = 0; // Tracks the count of white keys rendered so far (for x-positioning)
+  let whiteKeysInFirstHalf = 0;
+  for (let i = 0; i < middleIndex; i++) {
+    if (!allNoteNames[i].includes("#")) {
+      whiteKeysInFirstHalf++;
+    }
+  }
+
+  const totalWhiteKeys = allNoteNames.filter(
+    (note) => !note.includes("#"),
+  ).length;
+  const whiteKeysInSecondHalf = totalWhiteKeys - whiteKeysInFirstHalf;
+
+  let whiteKeyRenderedCountFirstHalf = 0;
+  let whiteKeyRenderedCountSecondHalf = 0;
   const whiteKeyXPositions = new Map(); // Store the x-position of white keys to help with black key placement
 
-  for (const note of allNoteNames) {
+  for (let i = 0; i < allNoteNames.length; i++) {
+    const note = allNoteNames[i];
     const isWhiteKey = !note.includes("#");
     const noteNameWithoutOctave = isWhiteKey
       ? note.slice(0, -1)
@@ -311,12 +344,23 @@ function buildAndInitScene(notes) {
       const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
       hitboxKey = new THREE.Mesh(whiteKeyHitboxGeometry, hitboxMaterial);
 
-      const xPos = whiteKeyRenderedCount;
+      let xPos;
+      if (i < middleIndex) {
+        xPos = whiteKeyRenderedCountFirstHalf - (whiteKeysInFirstHalf - 1) / 2;
+        renderKey.position.z = -whiteKeyLength / 2;
+        renderKey.position.y = 0.5;
+        whiteKeyRenderedCountFirstHalf++;
+      } else {
+        xPos =
+          whiteKeyRenderedCountSecondHalf - (whiteKeysInSecondHalf - 1) / 2;
+        renderKey.position.z = whiteKeyLength / 2;
+        whiteKeyRenderedCountSecondHalf++;
+      }
       renderKey.position.x = xPos;
-      hitboxKey.position.x = xPos;
+
+      hitboxKey.position.copy(renderKey.position);
 
       whiteKeyXPositions.set(note, xPos); // Store x-position for this white key
-      whiteKeyRenderedCount++;
     } else {
       // Black key
       const rootNoteLetter = noteNameWithoutOctave.charAt(0); // e.g., 'C' from 'C#'
@@ -335,8 +379,16 @@ function buildAndInitScene(notes) {
       // Calculate black key position relative to its preceding white key
       const precedingWhiteKeyX = whiteKeyXPositions.get(precedingWhiteNoteName);
       renderKey.position.x = precedingWhiteKeyX + 0.5;
-      renderKey.position.y = 0.5;
-      renderKey.position.z = -0.5;
+
+      if (i < middleIndex) {
+        renderKey.position.y = 1;
+        renderKey.position.z =
+          -whiteKeyLength / 2 - (whiteKeyLength - blackKeyLength) / 2;
+      } else {
+        renderKey.position.y = 0.5;
+        renderKey.position.z =
+          whiteKeyLength / 2 - (whiteKeyLength - blackKeyLength) / 2;
+      }
 
       hitboxKey.position.copy(renderKey.position);
     }
@@ -367,16 +419,16 @@ function buildAndInitScene(notes) {
   function updatePianoOrientation() {
     if (window.innerHeight > window.innerWidth) {
       // Portrait mode
-      pianoGroup.position.x = 0;
-      pianoGroup.position.z = -(whiteKeyRenderedCount - 1) / 2;
+      pianoGroup.position.x = -0.2;
+      pianoGroup.position.z = 0;
       pianoGroup.rotation.y = -Math.PI / 2;
       camera.up.set(0, 0, -1);
       camera.position.set(-15, 30, 0);
       camera.lookAt(0, 0, 0);
     } else {
       // Landscape mode
-      pianoGroup.position.x = -(whiteKeyRenderedCount - 1) / 2;
-      pianoGroup.position.z = 0;
+      pianoGroup.position.x = 0;
+      pianoGroup.position.z = 0.2;
       pianoGroup.rotation.y = 0;
       camera.up.set(0, 1, 0);
       camera.position.set(0, 30, 15);
