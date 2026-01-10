@@ -55,6 +55,14 @@ canvas {
     top: 50%;
     transform: translateY(-50%) rotate(90deg);
   }
+
+  #toast {
+    bottom: auto;
+    top: 50%;
+    left: 20px;
+    right: auto;
+    transform: translateY(-50%) rotate(90deg);
+  }
 }
 
 #share-button {

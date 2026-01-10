@@ -546,14 +546,10 @@ function buildAndInitScene(notes) {
   }
 
   function onPointerMove(event) {
-    if (event.type === "mousemove" && isMouseDown) {
-      handlePointerMove("mouse", event.clientX, event.clientY);
-    } else if (event.type === "touchmove") {
+    if (event.type === "touchmove") {
       event.preventDefault();
-      for (const touch of event.changedTouches) {
-        handlePointerMove(touch.identifier, touch.clientX, touch.clientY);
-      }
     }
+    // All other move events are ignored to prevent dragging from playing notes.
   }
 
   function onPointerUp(event) {
