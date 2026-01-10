@@ -1,3 +1,4 @@
+import { registerSW } from "virtual:pwa-register";
 import "./style.css";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -9,6 +10,8 @@ import {
   fadeOutAndDisconnect,
 } from "./audio.js";
 import { parseMelodyFromURL, calculateTempoAndQuantize } from "./melody.js";
+
+registerSW();
 
 const scene = new THREE.Scene();
 const pianoGroup = new THREE.Group();
