@@ -8,7 +8,6 @@ import {
   isAudioReady,
   fadeOutAndDisconnect,
 } from "./audio.js";
-import { parseMelodyFromURL, calculateTempoAndQuantize } from "./melody.js";
 
 const scene = new THREE.Scene();
 const pianoGroup = new THREE.Group();
@@ -54,14 +53,6 @@ const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 
-// --- State variables for recording ---
-let isRecording = false;
-let recordedNotes = [];
-let silenceTimeout = null;
-let recordedMelody = "";
-let recordedTempo = 120;
-const SILENCE_THRESHOLD = 2000; // 2 seconds
-
 // --- State variables to be initialized in buildAndInitScene ---
 let keyState,
   activePointers,
@@ -94,10 +85,6 @@ overlay.addEventListener(
   async () => {
     await initAudio();
     overlay.style.display = "none";
-    melody = parseMelodyFromURL();
-    if (melody.length > 0) {
-      playMelody();
-    }
   },
   { once: true },
 );
@@ -112,30 +99,6 @@ function getNoteFromObject(object) {
   return noteMap.get(object);
 }
 
-function startRecording() {
-  if (melody.length > 0) return;
-  isRecording = true;
-  recordedNotes = [];
-  console.log("Recording started");
-  document.getElementById("share-container").style.display = "none";
-}
-
-function stopRecording() {
-  if (!isRecording) return;
-  isRecording = false;
-  console.log("Recording stopped");
-
-  if (recordedNotes.length < 2) return;
-
-  const { melody, tempo } = calculateTempoAndQuantize(recordedNotes);
-  recordedMelody = melody;
-  recordedTempo = tempo;
-
-  const shareContainer = document.getElementById("share-container");
-  shareContainer.style.display = "block";
-  shareContainer.style.opacity = "1";
-}
-
 function pressKey(hitbox, pointerId, playAudio = true) {
   const renderKey = hitboxMap.get(hitbox);
   if (!keyState.has(hitbox) || keyState.get(hitbox).size === 0) {
@@ -147,16 +110,6 @@ function pressKey(hitbox, pointerId, playAudio = true) {
 
   const note = getNoteFromObject(hitbox);
   if (note) {
-    if (melody.length === 0 && !isRecording) {
-      startRecording();
-    }
-
-    if (isRecording) {
-      clearTimeout(silenceTimeout);
-      const now = Date.now();
-      recordedNotes.push({ note: note, startTime: now, endTime: 0 });
-    }
-
     if (
       playbackState === "PLAY" &&
       melody.length > 0 &&
@@ -202,18 +155,6 @@ function releaseKey(hitbox, pointerId, stopAudio = true) {
       renderKey.position.y += 0.2;
       keyState.delete(hitbox);
 
-      if (isRecording) {
-        const note = getNoteFromObject(hitbox);
-        const noteToUpdate = recordedNotes.find(
-          (n) => n.note === note && n.endTime === 0,
-        );
-        if (noteToUpdate) {
-          noteToUpdate.endTime = Date.now();
-        }
-        clearTimeout(silenceTimeout);
-        silenceTimeout = setTimeout(stopRecording, SILENCE_THRESHOLD);
-      }
-
       if (stopAudio) {
         const noteGainNode = activeNoteGainNodes.get(hitbox);
         if (noteGainNode) {
@@ -239,29 +180,6 @@ function handlePointerDown(pointerId, clientX, clientY) {
   if (intersects.length > 0) {
     const hitbox = intersects[0].object;
     pressKey(hitbox, pointerId);
-  }
-}
-
-function handlePointerMove(pointerId, clientX, clientY) {
-  if (!isAudioReady()) return;
-  const lastHitbox = activePointers.get(pointerId);
-
-  const vec = new THREE.Vector2(
-    (clientX / window.innerWidth) * 2 - 1,
-    -(clientY / window.innerHeight) * 2 + 1,
-  );
-  raycaster.setFromCamera(vec, camera);
-  const intersects = raycaster.intersectObjects(hitboxKeys);
-
-  const currentHitbox = intersects.length > 0 ? intersects[0].object : null;
-
-  if (currentHitbox !== lastHitbox) {
-    if (lastHitbox) {
-      releaseKey(lastHitbox, pointerId);
-    }
-    if (currentHitbox) {
-      pressKey(currentHitbox, pointerId);
-    }
   }
 }
 
@@ -441,11 +359,8 @@ function buildAndInitScene(notes) {
 
   raycaster = new THREE.Raycaster();
 
-  let isMouseDown = false;
-
   function onPointerDown(event) {
     if (event.type === "mousedown") {
-      isMouseDown = true;
       handlePointerDown("mouse", event.clientX, event.clientY);
     } else {
       // Touch events
@@ -465,7 +380,6 @@ function buildAndInitScene(notes) {
 
   function onPointerUp(event) {
     if (event.type === "mouseup") {
-      isMouseDown = false;
       handlePointerUp("mouse");
     } else {
       // Touch events
@@ -483,15 +397,6 @@ function buildAndInitScene(notes) {
   renderer.domElement.addEventListener("touchend", onPointerUp, false);
   renderer.domElement.addEventListener("touchmove", onPointerMove, false);
   renderer.domElement.addEventListener("touchcancel", onPointerUp, false);
-
-  document.getElementById("share-button").addEventListener("click", (e) => {
-    e.preventDefault();
-    const url = new URL(window.location.href);
-    url.searchParams.set("melody", recordedMelody);
-    url.searchParams.set("tempo", recordedTempo);
-    const finalUrl = url.href.replace(/%2C/g, ",");
-    window.open(finalUrl, "_blank");
-  });
 
   animate();
 }
