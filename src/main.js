@@ -59,8 +59,6 @@ const pressedNotes = new Set();
 let toggleCoolDown = false; // To prevent rapid toggling
 const demoGainNodes = new Set();
 
-let justToggledRecording = false;
-
 // --- State variables for recording ---
 let isRecording = false;
 let recordedNotes = [];
@@ -163,11 +161,6 @@ function pressKey(hitbox, pointerId, playAudio = true) {
     if (pointerId !== "demo") {
       pressedNotes.add(note);
       checkToggleCombination();
-    }
-
-    if (justToggledRecording) {
-      justToggledRecording = false;
-      return;
     }
 
     if (currentMode === "RECORDING" && !isRecording) {
@@ -348,7 +341,6 @@ function checkToggleCombination() {
     } else if (currentMode === "FREE_PLAY") {
       currentMode = "RECORDING";
       showToast("Recording...");
-      justToggledRecording = true;
       startRecording();
       console.log("Switched to RECORDING mode");
     } else if (currentMode === "RECORDING") {
