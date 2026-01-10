@@ -9,8 +9,6 @@ import {
   fadeOutAndDisconnect,
 } from "./audio.js";
 
-import { Midi } from "@tonejs/midi";
-
 const scene = new THREE.Scene();
 const pianoGroup = new THREE.Group();
 scene.add(pianoGroup);
@@ -82,43 +80,14 @@ updateCamera();
 
 // --- Overlay Setup ---
 const overlay = document.querySelector("#overlay");
-const playButton = document.querySelector("#play-button");
-const loadButton = document.querySelector("#load-button");
-const midiFileInput = document.querySelector("#midi-file-input");
-
-playButton.addEventListener("click", async () => {
-  await initAudio();
-  overlay.style.display = "none";
-  playbackState = "PLAY";
-});
-
-loadButton.addEventListener("click", () => {
-  midiFileInput.click();
-});
-
-midiFileInput.addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  if (!file) {
-    return;
-  }
-
-  await initAudio();
-  overlay.style.display = "none";
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const midi = new Midi(e.target.result);
-    const allNotes = midi.tracks.flatMap((track) => track.notes);
-    allNotes.sort((a, b) => a.time - b.time);
-    melody = allNotes.map((note) => ({
-      note: note.name,
-      start: note.time,
-      duration: note.duration,
-    }));
-    playMelody();
-  };
-  reader.readAsArrayBuffer(file);
-});
+overlay.addEventListener(
+  "click",
+  async () => {
+    await initAudio();
+    overlay.style.display = "none";
+  },
+  { once: true },
+);
 
 // Pre-cache sounds and then build the scene
 cacheAllNoteSounds().then((notes) => {
