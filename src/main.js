@@ -53,11 +53,6 @@ const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
 });
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
-let currentMode = "FREE_PLAY"; // "FREE_PLAY", "MELODY", "RECORDING"
-const toggleCombination = new Set(["F1", "E3", "F3", "E5"]);
-const pressedNotes = new Set();
-let toggleCoolDown = false; // To prevent rapid toggling
-const demoGainNodes = new Set();
 
 // --- State variables for recording ---
 let isRecording = false;
@@ -101,10 +96,7 @@ overlay.addEventListener(
     overlay.style.display = "none";
     melody = parseMelodyFromURL();
     if (melody.length > 0) {
-      currentMode = "MELODY";
       playMelody();
-    } else {
-      currentMode = "FREE_PLAY";
     }
   },
   { once: true },
@@ -133,10 +125,7 @@ function stopRecording() {
   isRecording = false;
   console.log("Recording stopped");
 
-  if (recordedNotes.length < 2) {
-    document.getElementById("share-container").style.display = "none";
-    return;
-  }
+  if (recordedNotes.length < 2) return;
 
   const { melody, tempo } = calculateTempoAndQuantize(recordedNotes);
   recordedMelody = melody;
@@ -158,12 +147,7 @@ function pressKey(hitbox, pointerId, playAudio = true) {
 
   const note = getNoteFromObject(hitbox);
   if (note) {
-    if (pointerId !== "demo") {
-      pressedNotes.add(note);
-      checkToggleCombination();
-    }
-
-    if (currentMode === "RECORDING" && !isRecording) {
+    if (melody.length === 0 && !isRecording) {
       startRecording();
     }
 
@@ -218,15 +202,8 @@ function releaseKey(hitbox, pointerId, stopAudio = true) {
       renderKey.position.y += 0.2;
       keyState.delete(hitbox);
 
-      const note = getNoteFromObject(hitbox);
-      if (pointerId !== "demo" && note) {
-        pressedNotes.delete(note);
-        if (pressedNotes.size < toggleCombination.size) {
-          toggleCoolDown = false;
-        }
-      }
-
       if (isRecording) {
+        const note = getNoteFromObject(hitbox);
         const noteToUpdate = recordedNotes.find(
           (n) => n.note === note && n.endTime === 0,
         );
@@ -292,64 +269,6 @@ function handlePointerUp(pointerId) {
   const key = activePointers.get(pointerId);
   if (key) {
     releaseKey(key, pointerId);
-  }
-}
-
-function checkToggleCombination() {
-  if (toggleCoolDown || pressedNotes.size !== toggleCombination.size) {
-    return;
-  }
-
-  let allKeysMatch = true;
-  for (const key of toggleCombination) {
-    if (!pressedNotes.has(key)) {
-      allKeysMatch = false;
-      break;
-    }
-  }
-
-  if (allKeysMatch) {
-    console.log("Toggle combination pressed!");
-    toggleCoolDown = true; // prevent re-triggering until keys are released
-
-    if (currentMode === "MELODY") {
-      currentMode = "FREE_PLAY";
-      showToast("Free Play");
-      isDemoPlaying = false; // Stop any ongoing demo
-      playbackState = "PLAY"; // to prevent restart
-      melody = [];
-      currentNoteIndex = 0;
-      document.getElementById("share-container").style.display = "none";
-
-      // Stop all sounds and unhighlight all keys
-      noteToHitboxMap.forEach((hitbox, note) => unhighlightKey(note));
-      demoGainNodes.forEach((gainNode) => fadeOutAndDisconnect(gainNode, 0.1));
-      demoGainNodes.clear();
-      activeNoteGainNodes.forEach((gainNode) =>
-        fadeOutAndDisconnect(gainNode, 0.1),
-      );
-      activeNoteGainNodes.clear();
-
-      // Also clear any demo-pressed keys that might be stuck
-      keyState.forEach((pointers, hitbox) => {
-        if (pointers.has("demo")) {
-          releaseKey(hitbox, "demo", false);
-        }
-      });
-
-      console.log("Switched to FREE_PLAY mode");
-    } else if (currentMode === "FREE_PLAY") {
-      currentMode = "RECORDING";
-      showToast("Recording...");
-      startRecording();
-      console.log("Switched to RECORDING mode");
-    } else if (currentMode === "RECORDING") {
-      currentMode = "FREE_PLAY";
-      showToast("Free Play");
-      stopRecording();
-      document.getElementById("share-container").style.display = "none";
-      console.log("Recording stopped. Switched to FREE_PLAY mode.");
-    }
   }
 }
 
@@ -592,7 +511,6 @@ function playMelody() {
   console.log("Starting melody demo...");
 
   function playNoteAtIndex(index) {
-    if (!isDemoPlaying) return;
     const noteInfo = melody[index];
 
     // Play sound and highlight
@@ -603,16 +521,10 @@ function playMelody() {
       }
       highlightKey(noteInfo.note);
       const gainNode = playNote(noteInfo.note);
-      if (gainNode) {
-        demoGainNodes.add(gainNode);
-      }
       const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
       setTimeout(() => {
         unhighlightKey(noteInfo.note);
-        if (gainNode) {
-          fadeOutAndDisconnect(gainNode, 1);
-          demoGainNodes.delete(gainNode);
-        }
+        if (gainNode) fadeOutAndDisconnect(gainNode, 1);
         if (hitbox) {
           releaseKey(hitbox, "demo", false);
         }
@@ -629,11 +541,9 @@ function playMelody() {
       const pauseBeforePlayMode = 500; // ms
       setTimeout(
         () => {
-          if (!isDemoPlaying) return;
           console.log("Demo finished. Starting play mode.");
           playbackState = "PLAY";
           isDemoPlaying = false;
-          demoGainNodes.clear();
           startPlayMode();
         },
         noteInfo.duration * 1000 + pauseBeforePlayMode,
@@ -689,15 +599,6 @@ unhighlightKey = function (noteToUnhighlight) {
     }
   }
 };
-
-function showToast(message) {
-  const toast = document.getElementById("toast");
-  toast.textContent = message;
-  toast.classList.add("show");
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 2000);
-}
 
 function animate() {
   requestAnimationFrame(animate);
