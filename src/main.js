@@ -114,17 +114,6 @@ midiFileInput.addEventListener("change", async (event) => {
       start: note.time,
       duration: note.duration,
     }));
-    const uniqueNotes = [];
-    const seenNotes = new Set();
-
-    for (const note of melody) {
-      const noteId = `${note.start}-${note.note}`;
-      if (!seenNotes.has(noteId)) {
-        uniqueNotes.push(note);
-        seenNotes.add(noteId);
-      }
-    }
-    melody = uniqueNotes;
     playMelody();
   };
   reader.readAsArrayBuffer(file);
