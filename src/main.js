@@ -44,11 +44,18 @@ let noteMap;
 let hitboxMap;
 let noteToHitboxMap;
 const originalMaterials = new Map();
-const highlightMaterial = new THREE.MeshStandardMaterial({
-  color: 0x7777ff,
-  roughness: 0.2,
-  metalness: 0.1,
-});
+const highlightMaterials = [
+  new THREE.MeshStandardMaterial({
+    color: 0x7777ff,
+    roughness: 0.2,
+    metalness: 0.1,
+  }),
+  new THREE.MeshStandardMaterial({
+    color: 0xbb77ff,
+    roughness: 0.2,
+    metalness: 0.1,
+  }),
+];
 const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
   color: 0xffae5e,
   roughness: 0.2,
@@ -122,13 +129,20 @@ midiFileInput.addEventListener("change", async (event) => {
   const reader = new FileReader();
   reader.onload = (e) => {
     const midi = new Midi(e.target.result);
-    const allNotes = midi.tracks.flatMap((track) => track.notes);
-    allNotes.sort((a, b) => a.time - b.time);
-    melody = allNotes.map((note) => ({
-      note: note.name,
-      start: note.time,
-      duration: note.duration,
-    }));
+    const tracks = midi.tracks
+      .filter((track) => track.notes.length > 0)
+      .slice(0, 2);
+
+    melody = tracks.flatMap((track, trackIndex) =>
+      track.notes.map((note) => ({
+        note: note.name,
+        start: note.time,
+        duration: note.duration,
+        track: trackIndex,
+      })),
+    );
+    melody.sort((a, b) => a.start - b.start);
+
     playMelody();
   };
   reader.readAsArrayBuffer(file);
@@ -537,7 +551,7 @@ function playMelody() {
       if (hitbox) {
         pressKey(hitbox, "demo", false);
       }
-      highlightKey(noteInfo.note);
+      highlightKey(noteInfo.note, noteInfo.track);
       const gainNode = playNote(noteInfo.note);
       const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
       setTimeout(() => {
@@ -594,15 +608,15 @@ function advancePlayMode() {
     currentNoteIndex++;
     setTimeout(advancePlayMode, noteInfo.duration * 1000);
   } else {
-    highlightKey(noteInfo.note);
+    highlightKey(noteInfo.note, noteInfo.track);
   }
 }
 
-function highlightKey(noteToHighlight) {
+function highlightKey(noteToHighlight, trackIndex) {
   for (const [hitbox, noteName] of noteMap.entries()) {
     if (noteName === noteToHighlight) {
       const renderKey = hitboxMap.get(hitbox);
-      renderKey.material = highlightMaterial;
+      renderKey.material = highlightMaterials[trackIndex];
       break;
     }
   }
