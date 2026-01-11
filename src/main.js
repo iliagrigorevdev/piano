@@ -65,6 +65,18 @@ let keyState,
   raycaster,
   unhighlightKey;
 
+let touchStartX = 0;
+let touchStartY = 0;
+const swipeThreshold = 100; // Minimum distance for a swipe
+
+const lookAtPoints = [
+  new THREE.Vector3(0, 0, -2.5),
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(0, 0, 2.5),
+];
+let currentLookAtIndex = 1;
+let targetLookAt = lookAtPoints[currentLookAtIndex].clone();
+
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
   const aspectRatioX = window.innerWidth / maxDimension;
@@ -383,7 +395,6 @@ function buildAndInitScene(notes) {
       pianoGroup.rotation.y = -Math.PI / 2;
       camera.up.set(0, 0, -1);
       camera.position.set(-15, 30, 0);
-      camera.lookAt(0, 0, 0);
     } else {
       // Landscape mode
       pianoGroup.position.x = 0;
@@ -391,8 +402,8 @@ function buildAndInitScene(notes) {
       pianoGroup.rotation.y = 0;
       camera.up.set(0, 1, 0);
       camera.position.set(0, 30, 15);
-      camera.lookAt(0, 0, 0);
     }
+    camera.lookAt(targetLookAt);
   }
 
   // Initial call to set correct orientation on load
@@ -403,20 +414,77 @@ function buildAndInitScene(notes) {
   function onPointerDown(event) {
     if (event.type === "mousedown") {
       handlePointerDown("mouse", event.clientX, event.clientY);
+      touchStartX = event.clientX;
+      touchStartY = event.clientY;
     } else {
       // Touch events
       event.preventDefault();
       for (const touch of event.changedTouches) {
         handlePointerDown(touch.identifier, touch.clientX, touch.clientY);
       }
+      if (event.touches.length === 1) {
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+      }
     }
   }
 
   function onPointerMove(event) {
-    if (event.type === "touchmove") {
+    let clientX, clientY;
+    if (event.type === "mousemove" && event.buttons === 1) {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    } else if (event.type === "touchmove") {
+      if (event.touches.length > 1) {
+        return;
+      }
       event.preventDefault();
+      clientX = event.changedTouches[0].clientX;
+      clientY = event.changedTouches[0].clientY;
+    } else {
+      return;
     }
-    // All other move events are ignored to prevent dragging from playing notes.
+
+    const deltaX = clientX - touchStartX;
+    const deltaY = clientY - touchStartY;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const previousLookAtIndex = currentLookAtIndex;
+
+    if (isPortrait) {
+      if (
+        Math.abs(deltaX) > swipeThreshold &&
+        Math.abs(deltaX) > Math.abs(deltaY)
+      ) {
+        if (deltaX > 0) {
+          currentLookAtIndex = Math.max(0, currentLookAtIndex - 1);
+        } else {
+          currentLookAtIndex = Math.min(
+            lookAtPoints.length - 1,
+            currentLookAtIndex + 1,
+          );
+        }
+      }
+    } else {
+      if (
+        Math.abs(deltaY) > swipeThreshold &&
+        Math.abs(deltaY) > Math.abs(deltaX)
+      ) {
+        if (deltaY > 0) {
+          currentLookAtIndex = Math.max(0, currentLookAtIndex - 1);
+        } else {
+          currentLookAtIndex = Math.min(
+            lookAtPoints.length - 1,
+            currentLookAtIndex + 1,
+          );
+        }
+      }
+    }
+
+    if (previousLookAtIndex != currentLookAtIndex) {
+      touchStartX = clientX;
+      touchStartY = clientY;
+      targetLookAt.copy(lookAtPoints[currentLookAtIndex]);
+    }
   }
 
   function onPointerUp(event) {
@@ -427,6 +495,10 @@ function buildAndInitScene(notes) {
       event.preventDefault();
       for (const touch of event.changedTouches) {
         handlePointerUp(touch.identifier);
+      }
+      if (event.touches.length === 1) {
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
       }
     }
   }
@@ -546,7 +618,24 @@ unhighlightKey = function (noteToUnhighlight) {
   }
 };
 
+function animateToTarget() {
+  const worldTarget =
+    camera.up.z === -1
+      ? new THREE.Vector3(targetLookAt.z, targetLookAt.y, -targetLookAt.x)
+      : targetLookAt;
+
+  let currentDir = new THREE.Vector3();
+  camera.getWorldDirection(currentDir);
+  let targetDir = new THREE.Vector3()
+    .subVectors(worldTarget, camera.position)
+    .normalize();
+
+  let newDir = new THREE.Vector3().lerpVectors(currentDir, targetDir, 0.1);
+  camera.lookAt(camera.position.clone().add(newDir));
+}
+
 function animate() {
   requestAnimationFrame(animate);
+  animateToTarget();
   renderer.render(scene, camera);
 }
