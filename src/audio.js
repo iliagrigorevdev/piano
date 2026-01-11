@@ -174,7 +174,8 @@ function playNote(note) {
 
   const pitchKeyCenter = region.pitch_keycenter || region.lokey;
   const noteDifference = midiNote - pitchKeyCenter;
-  source.playbackRate.value = 2 ** (noteDifference / 12);
+  const detune = (Math.random() - 0.5) * 0.1; // Detune by up to 5 cents
+  source.playbackRate.value = 2 ** ((noteDifference + detune) / 12);
 
   const noteGainNode = audioContext.createGain();
   noteGainNode.connect(masterGainNode);
