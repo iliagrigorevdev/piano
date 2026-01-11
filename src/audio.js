@@ -143,7 +143,7 @@ async function cacheAllNoteSounds() {
   await Promise.all(cachePromises);
   console.log("Note sounds cached!");
 
-  return generateNoteRange("F1", "E5");
+  return generateNoteRange("A0", "C8");
 }
 
 function playNote(note) {

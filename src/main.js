@@ -256,101 +256,109 @@ function buildAndInitScene(notes) {
   hitboxKeys = [];
 
   const allNoteNames = Object.keys(notes);
-  const middleIndex = Math.floor(allNoteNames.length / 2);
+  const whiteKeyXPositions = new Map();
 
-  let whiteKeysInFirstHalf = 0;
-  for (let i = 0; i < middleIndex; i++) {
-    if (!allNoteNames[i].includes("#")) {
-      whiteKeysInFirstHalf++;
+  const chunkStartNotes = ["A0", "F2", "F4", "F6"];
+  const noteChunks = [];
+
+  for (let i = 0; i < chunkStartNotes.length; i++) {
+    const startNote = chunkStartNotes[i];
+    const endNote =
+      i + 1 < chunkStartNotes.length ? chunkStartNotes[i + 1] : "C8";
+    const startIndex = allNoteNames.indexOf(startNote);
+    let endIndex = allNoteNames.indexOf(endNote);
+
+    if (i + 1 < chunkStartNotes.length) {
+      endIndex--; // to not include the start of the next chunk
     }
+
+    const noteChunk = allNoteNames.slice(startIndex, endIndex + 1);
+    noteChunks.push(noteChunk);
   }
 
-  const totalWhiteKeys = allNoteNames.filter(
-    (note) => !note.includes("#"),
-  ).length;
-  const whiteKeysInSecondHalf = totalWhiteKeys - whiteKeysInFirstHalf;
+  const maxWhiteKeys = Math.max(
+    ...noteChunks.map((c) => c.filter((n) => !n.includes("#")).length),
+  );
 
-  let whiteKeyRenderedCountFirstHalf = 0;
-  let whiteKeyRenderedCountSecondHalf = 0;
-  const whiteKeyXPositions = new Map(); // Store the x-position of white keys to help with black key placement
+  noteChunks.forEach((chunk, chunkIndex) => {
+    let whiteKeyRenderedCount = 0;
+    const whiteKeysInChunk = chunk.filter((note) => !note.includes("#")).length;
+    const baseZ = (chunkIndex - (noteChunks.length - 1) / 2) * whiteKeyLength;
+    const baseY = (Math.ceil((noteChunks.length - 1) / 2) - chunkIndex) * 0.5;
 
-  for (let i = 0; i < allNoteNames.length; i++) {
-    const note = allNoteNames[i];
-    const isWhiteKey = !note.includes("#");
-    const noteNameWithoutOctave = isWhiteKey
-      ? note.slice(0, -1)
-      : note.slice(0, -2); // e.g., "C" from "C4", "C#" from "C#4"
-    const octave = note.slice(-1);
+    chunk.forEach((note) => {
+      const isWhiteKey = !note.includes("#");
+      const noteNameWithoutOctave = isWhiteKey
+        ? note.slice(0, -1)
+        : note.slice(0, -2);
+      const octave = note.slice(-1);
 
-    let renderKey, hitboxKey;
+      let renderKey, hitboxKey;
 
-    if (isWhiteKey) {
-      const renderMaterial = new THREE.MeshStandardMaterial({
-        color: 0xfafafa,
-        roughness: 0.2,
-        metalness: 0.1,
-      }); // White key
-      renderKey = new THREE.Mesh(whiteKeyRenderGeometry, renderMaterial);
+      if (isWhiteKey) {
+        const renderMaterial = new THREE.MeshStandardMaterial({
+          color: 0xfafafa,
+          roughness: 0.2,
+          metalness: 0.1,
+        });
+        renderKey = new THREE.Mesh(whiteKeyRenderGeometry, renderMaterial);
 
-      const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
-      hitboxKey = new THREE.Mesh(whiteKeyHitboxGeometry, hitboxMaterial);
+        const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
+        hitboxKey = new THREE.Mesh(whiteKeyHitboxGeometry, hitboxMaterial);
 
-      let xPos;
-      if (i < middleIndex) {
-        xPos = whiteKeyRenderedCountFirstHalf - (whiteKeysInFirstHalf - 1) / 2;
-        renderKey.position.z = -whiteKeyLength / 2;
-        renderKey.position.y = 0.5;
-        whiteKeyRenderedCountFirstHalf++;
+        let xPos;
+        if (chunkIndex === 0) {
+          // First chunk, right-align
+          const offset = maxWhiteKeys - whiteKeysInChunk;
+          xPos = whiteKeyRenderedCount + offset - (maxWhiteKeys - 1) / 2;
+        } else if (chunkIndex === noteChunks.length - 1) {
+          // Last chunk, left-align
+          const offset = 0;
+          xPos = whiteKeyRenderedCount + offset - (maxWhiteKeys - 1) / 2;
+        } else {
+          // Center-align
+          const offset = (maxWhiteKeys - whiteKeysInChunk) / 2;
+          xPos = whiteKeyRenderedCount + offset - (maxWhiteKeys - 1) / 2;
+        }
+        renderKey.position.x = xPos;
+        renderKey.position.y = baseY;
+        renderKey.position.z = baseZ;
+
+        hitboxKey.position.copy(renderKey.position);
+        whiteKeyXPositions.set(note, xPos);
+        whiteKeyRenderedCount++;
       } else {
-        xPos =
-          whiteKeyRenderedCountSecondHalf - (whiteKeysInSecondHalf - 1) / 2;
-        renderKey.position.z = whiteKeyLength / 2;
-        whiteKeyRenderedCountSecondHalf++;
-      }
-      renderKey.position.x = xPos;
+        const rootNoteLetter = noteNameWithoutOctave.charAt(0);
+        const precedingWhiteNoteName = rootNoteLetter + octave;
 
-      hitboxKey.position.copy(renderKey.position);
+        const renderMaterial = new THREE.MeshStandardMaterial({
+          color: 0x222222,
+          roughness: 0.3,
+          metalness: 0.1,
+        });
+        renderKey = new THREE.Mesh(blackKeyRenderGeometry, renderMaterial);
 
-      whiteKeyXPositions.set(note, xPos); // Store x-position for this white key
-    } else {
-      // Black key
-      const rootNoteLetter = noteNameWithoutOctave.charAt(0); // e.g., 'C' from 'C#'
-      const precedingWhiteNoteName = rootNoteLetter + octave; // e.g., "F3" for "F#3"
+        const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
+        hitboxKey = new THREE.Mesh(blackKeyHitboxGeometry, hitboxMaterial);
 
-      const renderMaterial = new THREE.MeshStandardMaterial({
-        color: 0x222222,
-        roughness: 0.3,
-        metalness: 0.1,
-      }); // Black key
-      renderKey = new THREE.Mesh(blackKeyRenderGeometry, renderMaterial);
-
-      const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
-      hitboxKey = new THREE.Mesh(blackKeyHitboxGeometry, hitboxMaterial);
-
-      // Calculate black key position relative to its preceding white key
-      const precedingWhiteKeyX = whiteKeyXPositions.get(precedingWhiteNoteName);
-      renderKey.position.x = precedingWhiteKeyX + 0.5;
-
-      if (i < middleIndex) {
-        renderKey.position.y = 1;
-        renderKey.position.z =
-          -whiteKeyLength / 2 - (whiteKeyLength - blackKeyLength) / 2;
-      } else {
-        renderKey.position.y = 0.5;
-        renderKey.position.z =
-          whiteKeyLength / 2 - (whiteKeyLength - blackKeyLength) / 2;
+        const precedingWhiteKeyX = whiteKeyXPositions.get(
+          precedingWhiteNoteName,
+        );
+        renderKey.position.x = precedingWhiteKeyX + 0.5;
+        renderKey.position.y = baseY + 0.5;
+        renderKey.position.z = baseZ - (whiteKeyLength - blackKeyLength) / 2;
+        hitboxKey.position.copy(renderKey.position);
       }
 
-      hitboxKey.position.copy(renderKey.position);
-    }
-    pianoGroup.add(renderKey);
-    pianoGroup.add(hitboxKey);
-    hitboxKeys.push(hitboxKey);
-    hitboxMap.set(hitboxKey, renderKey);
-    noteMap.set(hitboxKey, note);
-    noteToHitboxMap.set(note, hitboxKey);
-    originalMaterials.set(note, renderKey.material);
-  }
+      pianoGroup.add(renderKey);
+      pianoGroup.add(hitboxKey);
+      hitboxKeys.push(hitboxKey);
+      hitboxMap.set(hitboxKey, renderKey);
+      noteMap.set(hitboxKey, note);
+      noteToHitboxMap.set(note, hitboxKey);
+      originalMaterials.set(note, renderKey.material);
+    });
+  });
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
   pianoGroup.add(ambientLight);
