@@ -67,7 +67,7 @@ let keyState,
 
 let touchStartX = 0;
 let touchStartY = 0;
-const swipeThreshold = 100; // Minimum distance for a swipe
+const swipeThreshold = 50; // Minimum distance for a swipe
 
 const lookAtPoints = [
   new THREE.Vector3(0, 0, -2.5),
