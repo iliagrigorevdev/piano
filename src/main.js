@@ -8,6 +8,7 @@ import {
   playNote,
   isAudioReady,
   fadeOutAndDisconnect,
+  midiToNoteName,
 } from "./audio.js";
 import { Midi } from "@tonejs/midi";
 
@@ -113,10 +114,10 @@ async function createMelodyList() {
   const melodies = text
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line)
+    .filter((line) => line && !line.startsWith("#"))
     .map((line) => {
-      const [file, description] = line.split("|");
-      return { file, description };
+      const [file, description, transpose] = line.split("|");
+      return { file, description, transpose: parseInt(transpose, 10) || 0 };
     });
 
   const ul = document.createElement("ul");
@@ -125,6 +126,7 @@ async function createMelodyList() {
     const li = document.createElement("li");
     li.textContent = melodyItem.description;
     li.dataset.file = melodyItem.file;
+    li.dataset.transpose = melodyItem.transpose;
     li.addEventListener("click", async () => {
       if (selectedMelodyFile === melodyItem.file) {
         return;
@@ -138,7 +140,7 @@ async function createMelodyList() {
       );
       li.classList.add("selected");
 
-      await loadMelody(melodyItem.file);
+      await loadMelody(melodyItem.file, melodyItem.transpose);
       playMelodyDemo();
     });
     ul.appendChild(li);
@@ -147,10 +149,19 @@ async function createMelodyList() {
   melodiesContainer.appendChild(ul);
 }
 
-async function loadMelody(melodyFile) {
+async function loadMelody(melodyFile, transpose = 0) {
   const response = await fetch(`melodies/${melodyFile}`);
   const midiData = await response.arrayBuffer();
   const midi = new Midi(midiData);
+
+  midi.tracks.forEach((track) => {
+    track.notes.forEach((note) => {
+      const transposedMidi = note.midi + transpose;
+      note.midi = transposedMidi;
+      note.name = midiToNoteName(transposedMidi);
+    });
+  });
+
   const tracks = midi.tracks
     .filter((track) => track.notes.length > 0)
     .slice(0, 2);
@@ -172,7 +183,11 @@ playButton.addEventListener("click", async () => {
   stopMelodyDemo();
   if (selectedMelodyFile) {
     playbackState = "PLAY";
-    await loadMelody(selectedMelodyFile);
+    const selectedMelodyLi = melodiesContainer.querySelector(
+      `[data-file="${selectedMelodyFile}"]`,
+    );
+    const transpose = parseInt(selectedMelodyLi.dataset.transpose, 10) || 0;
+    await loadMelody(selectedMelodyFile, transpose);
     startPlayMode();
   } else {
     playbackState = "PLAY";

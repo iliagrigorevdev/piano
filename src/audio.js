@@ -101,6 +101,12 @@ function noteNameToMidi(note) {
   return 12 * (octave + 1) + noteIndex;
 }
 
+function midiToNoteName(midi) {
+  const octave = Math.floor(midi / 12) - 1;
+  const noteIndex = midi % 12;
+  return ORDERED_NOTE_NAMES[noteIndex] + octave;
+}
+
 // SFZ data
 let regions = [];
 const cachedNoteBuffers = new Map();
@@ -209,4 +215,5 @@ export {
   playNote,
   isAudioReady,
   fadeOutAndDisconnect,
+  midiToNoteName,
 };
