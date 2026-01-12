@@ -17,6 +17,7 @@ canvas {
   background: rgba(0, 0, 0, 0.7);
   z-index: 10;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
 }
@@ -26,4 +27,35 @@ canvas {
   padding: 1rem 2rem;
   margin: 1rem;
   cursor: pointer;
+}
+
+#melodies-container {
+  color: white;
+  margin: 20px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+#melodies-container ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#melodies-container li {
+  padding: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+#melodies-container li:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#melodies-container li.selected {
+  border-color: #ffae5e;
+  background-color: rgba(255, 174, 94, 0.2);
 }

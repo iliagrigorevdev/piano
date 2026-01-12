@@ -63,6 +63,7 @@ const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
 });
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
+let selectedMelodyFile = null;
 
 // --- State variables to be initialized in buildAndInitScene ---
 let keyState,
@@ -104,49 +105,81 @@ updateCamera();
 // --- Overlay Setup ---
 const overlay = document.querySelector("#overlay");
 const playButton = document.querySelector("#play-button");
-const loadButton = document.querySelector("#load-button");
-const midiFileInput = document.querySelector("#midi-file-input");
+const melodiesContainer = document.querySelector("#melodies-container");
+
+async function createMelodyList() {
+  const response = await fetch("melodies/melodies.txt");
+  const text = await response.text();
+  const melodies = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line)
+    .map((line) => {
+      const [file, description] = line.split("|");
+      return { file, description };
+    });
+
+  const ul = document.createElement("ul");
+
+  melodies.forEach((melodyItem) => {
+    const li = document.createElement("li");
+    li.textContent = melodyItem.description;
+    li.dataset.file = melodyItem.file;
+    li.addEventListener("click", async () => {
+      if (selectedMelodyFile === melodyItem.file) {
+        return;
+      }
+
+      selectedMelodyFile = melodyItem.file;
+
+      // Update selection visuals
+      ul.querySelectorAll("li").forEach((item) =>
+        item.classList.remove("selected"),
+      );
+      li.classList.add("selected");
+
+      await loadMelody(melodyItem.file);
+      playMelodyDemo();
+    });
+    ul.appendChild(li);
+  });
+
+  melodiesContainer.appendChild(ul);
+}
+
+async function loadMelody(melodyFile) {
+  const response = await fetch(`melodies/${melodyFile}`);
+  const midiData = await response.arrayBuffer();
+  const midi = new Midi(midiData);
+  const tracks = midi.tracks
+    .filter((track) => track.notes.length > 0)
+    .slice(0, 2);
+
+  melody = tracks.flatMap((track, trackIndex) =>
+    track.notes.map((note) => ({
+      note: note.name,
+      start: note.time,
+      duration: note.duration,
+      track: trackIndex,
+    })),
+  );
+  melody.sort((a, b) => a.start - b.start);
+}
 
 playButton.addEventListener("click", async () => {
   await initAudio();
   overlay.style.display = "none";
-  playbackState = "PLAY";
-});
-
-loadButton.addEventListener("click", () => {
-  midiFileInput.click();
-});
-
-midiFileInput.addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  if (!file) {
-    return;
+  stopMelodyDemo();
+  if (selectedMelodyFile) {
+    playbackState = "PLAY";
+    await loadMelody(selectedMelodyFile);
+    startPlayMode();
+  } else {
+    playbackState = "PLAY";
   }
-
-  await initAudio();
-  overlay.style.display = "none";
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const midi = new Midi(e.target.result);
-    const tracks = midi.tracks
-      .filter((track) => track.notes.length > 0)
-      .slice(0, 2);
-
-    melody = tracks.flatMap((track, trackIndex) =>
-      track.notes.map((note) => ({
-        note: note.name,
-        start: note.time,
-        duration: note.duration,
-        track: trackIndex,
-      })),
-    );
-    melody.sort((a, b) => a.start - b.start);
-
-    playMelody();
-  };
-  reader.readAsArrayBuffer(file);
 });
+
+createMelodyList();
 
 // Pre-cache sounds and then build the scene
 cacheAllNoteSounds().then((notes) => {
@@ -528,8 +561,33 @@ function buildAndInitScene(notes) {
   animate();
 }
 
-function playMelody() {
-  if (isDemoPlaying) return;
+let demoNoteTimeouts = [];
+
+function stopMelodyDemo() {
+  if (!isDemoPlaying) return;
+
+  console.log("Stopping melody demo...");
+  demoNoteTimeouts.forEach(clearTimeout);
+  demoNoteTimeouts = [];
+  isDemoPlaying = false;
+
+  // Clear any active highlights and sound
+  keyState.forEach((pointers, hitbox) => {
+    const note = getNoteFromObject(hitbox);
+    unhighlightKey(note);
+    // Release all pointers for the key
+    pointers.forEach((pointerId) => {
+      releaseKey(hitbox, pointerId, false);
+    });
+  });
+  activeNoteGainNodes.forEach((gainNode) => {
+    fadeOutAndDisconnect(gainNode, 0.1);
+  });
+  activeNoteGainNodes.clear();
+}
+
+function playMelodyDemo() {
+  stopMelodyDemo();
   isDemoPlaying = true;
 
   // This is the DEMO player
@@ -554,32 +612,32 @@ function playMelody() {
       highlightKey(noteInfo.note, noteInfo.track);
       const gainNode = playNote(noteInfo.note);
       const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
-      setTimeout(() => {
+
+      const timeoutId = setTimeout(() => {
         unhighlightKey(noteInfo.note);
         if (gainNode) fadeOutAndDisconnect(gainNode, 1);
         if (hitbox) {
           releaseKey(hitbox, "demo", false);
         }
       }, releaseDelay);
+      demoNoteTimeouts.push(timeoutId);
     }
 
     // Schedule next note
     if (index + 1 < melody.length) {
       const nextNoteInfo = melody[index + 1];
       const delay = (nextNoteInfo.start - noteInfo.start) * 1000;
-      setTimeout(() => playNoteAtIndex(index + 1), delay);
+
+      const timeoutId = setTimeout(() => playNoteAtIndex(index + 1), delay);
+      demoNoteTimeouts.push(timeoutId);
     } else {
-      // This is the last note, schedule transition to PLAY mode
-      const pauseBeforePlayMode = 500; // ms
-      setTimeout(
-        () => {
-          console.log("Demo finished. Starting play mode.");
-          playbackState = "PLAY";
-          isDemoPlaying = false;
-          startPlayMode();
-        },
-        noteInfo.duration * 1000 + pauseBeforePlayMode,
-      );
+      const timeoutId = setTimeout(() => {
+        isDemoPlaying = false;
+
+        demoNoteTimeouts = [];
+      }, noteInfo.duration * 1000);
+
+      demoNoteTimeouts.push(timeoutId);
     }
   }
 
@@ -598,7 +656,7 @@ function advancePlayMode() {
   if (currentNoteIndex >= melody.length) {
     console.log("Melody finished! Restarting demo.");
     playbackState = "DEMO";
-    setTimeout(playMelody, 1000);
+    setTimeout(playMelodyDemo, 1000);
     return;
   }
 
@@ -623,11 +681,11 @@ function highlightKey(noteToHighlight, trackIndex) {
 }
 
 unhighlightKey = function (noteToUnhighlight) {
-  for (const [hitbox, noteName] of noteMap.entries()) {
-    if (noteName === noteToUnhighlight) {
-      const renderKey = hitboxMap.get(hitbox);
-      renderKey.material = originalMaterials.get(noteName);
-      break;
+  const hitbox = noteToHitboxMap.get(noteToUnhighlight);
+  if (hitbox) {
+    const renderKey = hitboxMap.get(hitbox);
+    if (renderKey) {
+      renderKey.material = originalMaterials.get(noteToUnhighlight);
     }
   }
 };
