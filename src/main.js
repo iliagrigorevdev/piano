@@ -67,6 +67,7 @@ let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 let selectedMelodyFile = null;
 let isMelodyFinishing = false;
+let demoPlayingNotes = new Map();
 
 // --- State variables to be initialized in buildAndInitScene ---
 let keyState,
@@ -610,18 +611,15 @@ function stopMelodyDemo() {
   isDemoPlaying = false;
 
   // Clear any active highlights and sound
-  keyState.forEach((pointers, hitbox) => {
-    const note = getNoteFromObject(hitbox);
+  demoPlayingNotes.forEach((gainNode, note) => {
+    const hitbox = noteToHitboxMap.get(note);
     unhighlightKey(note);
-    // Release all pointers for the key
-    pointers.forEach((pointerId) => {
-      releaseKey(hitbox, pointerId, false);
-    });
-  });
-  activeNoteGainNodes.forEach((gainNode) => {
+    if (hitbox) {
+      releaseKey(hitbox, "demo", false);
+    }
     fadeOutAndDisconnect(gainNode, 0.1);
   });
-  activeNoteGainNodes.clear();
+  demoPlayingNotes.clear();
 }
 
 function playMelodyDemo() {
@@ -649,11 +647,17 @@ function playMelodyDemo() {
       }
       highlightKey(noteInfo.note, noteInfo.track);
       const gainNode = playNote(noteInfo.note);
+      if (gainNode) {
+        demoPlayingNotes.set(noteInfo.note, gainNode);
+      }
       const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
 
       const timeoutId = setTimeout(() => {
         unhighlightKey(noteInfo.note);
-        if (gainNode) fadeOutAndDisconnect(gainNode, 1);
+        if (gainNode) {
+          fadeOutAndDisconnect(gainNode, 1);
+          demoPlayingNotes.delete(noteInfo.note);
+        }
         if (hitbox) {
           releaseKey(hitbox, "demo", false);
         }
