@@ -82,11 +82,12 @@ let touchStartY = 0;
 const swipeThreshold = 50; // Minimum distance for a swipe
 
 const lookAtPoints = [
-  new THREE.Vector3(0, 0, -2.5),
-  new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(0, 0, 2.5),
+  new THREE.Vector3(0, 0, -3.75),
+  new THREE.Vector3(0, 0, -1.25),
+  new THREE.Vector3(0, 0, 1.25),
+  new THREE.Vector3(0, 0, 3.75),
 ];
-let currentLookAtIndex = 1;
+let currentLookAtIndex = 2;
 let targetLookAt = lookAtPoints[currentLookAtIndex].clone();
 
 function updateCamera() {
@@ -356,7 +357,7 @@ function buildAndInitScene(notes) {
   const allNoteNames = Object.keys(notes);
   const whiteKeyXPositions = new Map();
 
-  const chunkStartNotes = ["A0", "F2", "F4", "F6"];
+  const chunkStartNotes = ["A0", "F1", "F3", "F5", "F7"];
   const noteChunks = [];
 
   for (let i = 0; i < chunkStartNotes.length; i++) {
