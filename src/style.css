@@ -34,6 +34,10 @@ canvas {
   margin: 20px;
   max-height: 50vh;
   overflow-y: auto;
+  border: 1px solid #ffae5e; /* Added border */
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 10px;
+  border-radius: 8px;
 }
 
 #melodies-container ul {
