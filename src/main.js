@@ -131,6 +131,12 @@ async function createMelodyList() {
     li.dataset.transpose = melodyItem.transpose;
     li.addEventListener("click", async () => {
       if (selectedMelodyFile === melodyItem.file) {
+        // If the same melody is clicked again, deselect it
+        selectedMelodyFile = null;
+        melody = [];
+        currentNoteIndex = 0;
+        li.classList.remove("selected");
+        stopMelodyDemo();
         return;
       }
 
@@ -206,6 +212,8 @@ playButton.addEventListener("click", async () => {
     startPlayMode();
   } else {
     playbackState = "PLAY";
+    melody = [];
+    currentNoteIndex = 0;
   }
 });
 
