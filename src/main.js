@@ -11,6 +11,7 @@ import {
   midiToNoteName,
 } from "./audio.js";
 import { Midi } from "@tonejs/midi";
+import { showCongratsEffect } from "./congrats.js";
 
 registerSW();
 
@@ -65,6 +66,7 @@ const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 let selectedMelodyFile = null;
+let isMelodyFinishing = false;
 
 // --- State variables to be initialized in buildAndInitScene ---
 let keyState,
@@ -175,6 +177,19 @@ async function loadMelody(melodyFile, transpose = 0) {
     })),
   );
   melody.sort((a, b) => a.start - b.start);
+}
+
+function showMelodySelection() {
+  overlay.style.display = "flex";
+  selectedMelodyFile = null;
+  melody = [];
+  currentNoteIndex = 0;
+  playbackState = "DEMO";
+
+  // Deselect melody in UI
+  melodiesContainer
+    .querySelectorAll("li")
+    .forEach((item) => item.classList.remove("selected"));
 }
 
 playButton.addEventListener("click", async () => {
@@ -661,17 +676,23 @@ function playMelodyDemo() {
 
 function startPlayMode() {
   console.log("Starting play mode");
+  isMelodyFinishing = false;
   currentNoteIndex = 0;
   if (melody.length > 0) {
     advancePlayMode();
   }
 }
 
-function advancePlayMode() {
+async function advancePlayMode() {
   if (currentNoteIndex >= melody.length) {
-    console.log("Melody finished! Restarting demo.");
-    playbackState = "DEMO";
-    setTimeout(playMelodyDemo, 1000);
+    if (isMelodyFinishing) {
+      return;
+    }
+    isMelodyFinishing = true;
+    console.log("Melody finished!");
+    playbackState = "DEMO"; // Go to a neutral state
+    await showCongratsEffect(scene);
+    showMelodySelection();
     return;
   }
 
