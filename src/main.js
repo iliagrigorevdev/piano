@@ -87,7 +87,7 @@ const lookAtPoints = [
   new THREE.Vector3(0, 0, 1.25),
   new THREE.Vector3(0, 0, 3.75),
 ];
-let currentLookAtIndex = 2;
+let currentLookAtIndex = 1;
 let targetLookAt = lookAtPoints[currentLookAtIndex].clone();
 
 function updateCamera() {
@@ -490,7 +490,7 @@ function buildAndInitScene(notes) {
       camera.up.set(0, 1, 0);
       camera.position.set(0, 30, 15);
     }
-    camera.lookAt(targetLookAt);
+    camera.lookAt(getWorldTarget());
   }
 
   // Initial call to set correct orientation on load
@@ -542,7 +542,7 @@ function buildAndInitScene(notes) {
         Math.abs(deltaX) > swipeThreshold &&
         Math.abs(deltaX) > Math.abs(deltaY)
       ) {
-        if (deltaX > 0) {
+        if (deltaX < 0) {
           currentLookAtIndex = Math.max(0, currentLookAtIndex - 1);
         } else {
           currentLookAtIndex = Math.min(
@@ -739,11 +739,14 @@ unhighlightKey = function (noteToUnhighlight) {
   }
 };
 
+function getWorldTarget() {
+  return camera.up.z === -1
+    ? new THREE.Vector3(-targetLookAt.z, targetLookAt.y, targetLookAt.x)
+    : targetLookAt;
+}
+
 function animateToTarget() {
-  const worldTarget =
-    camera.up.z === -1
-      ? new THREE.Vector3(targetLookAt.z, targetLookAt.y, -targetLookAt.x)
-      : targetLookAt;
+  const worldTarget = getWorldTarget();
 
   let currentDir = new THREE.Vector3();
   camera.getWorldDirection(currentDir);
