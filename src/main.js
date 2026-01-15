@@ -85,6 +85,7 @@ let cameraWaypoints = [];
 let currentWaypointIndex = 0;
 let targetCameraPosition = new THREE.Vector3();
 const cameraLookAt = new THREE.Vector3();
+let chunkYPositions = [];
 
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
@@ -103,12 +104,14 @@ function updateCamera() {
 function updateTargetHandles() {
   const isPortrait = window.innerHeight > window.innerWidth;
   const z = cameraWaypoints[currentWaypointIndex];
+  const lowerChunkY = chunkYPositions[currentWaypointIndex + 1];
+  const cameraHeight = 30 + lowerChunkY;
   if (isPortrait) {
-    targetCameraPosition.set(-z - 15, 30, 0);
-    cameraLookAt.set(-z, 0, 0);
+    targetCameraPosition.set(-z - 15, cameraHeight, 0);
+    cameraLookAt.set(-z, lowerChunkY, 0);
   } else {
-    targetCameraPosition.set(0, 30, z + 15);
-    cameraLookAt.set(0, 0, z);
+    targetCameraPosition.set(0, cameraHeight, z + 15);
+    cameraLookAt.set(0, lowerChunkY, z);
   }
 }
 
@@ -384,6 +387,7 @@ function buildAndInitScene(notes) {
   }
 
   cameraWaypoints = [];
+  chunkYPositions = [];
   const numWaypoints = noteChunks.length - 1;
   for (let i = 0; i < numWaypoints; i++) {
     const waypointZ = (i + 0.5 - numWaypoints / 2) * whiteKeyLength;
@@ -400,6 +404,7 @@ function buildAndInitScene(notes) {
     const whiteKeysInChunk = chunk.filter((note) => !note.includes("#")).length;
     const baseZ = (chunkIndex - (noteChunks.length - 1) / 2) * whiteKeyLength;
     const baseY = (Math.ceil((noteChunks.length - 1) / 2) - chunkIndex) * 0.5;
+    chunkYPositions.push(baseY);
 
     chunk.forEach((note) => {
       const isWhiteKey = !note.includes("#");
@@ -493,14 +498,14 @@ function buildAndInitScene(notes) {
   function updatePianoOrientation() {
     if (window.innerHeight > window.innerWidth) {
       // Portrait mode
-      pianoGroup.position.x = -0.2;
+      pianoGroup.position.x = -0.25;
       pianoGroup.position.z = 0;
       pianoGroup.rotation.y = -Math.PI / 2;
       camera.up.set(0, 0, -1);
     } else {
       // Landscape mode
       pianoGroup.position.x = 0;
-      pianoGroup.position.z = 0.2;
+      pianoGroup.position.z = 0.25;
       pianoGroup.rotation.y = 0;
       camera.up.set(0, 1, 0);
     }
