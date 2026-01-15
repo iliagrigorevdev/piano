@@ -86,6 +86,8 @@ let currentWaypointIndex = 0;
 let targetCameraPosition = new THREE.Vector3();
 const cameraLookAt = new THREE.Vector3();
 let chunkYPositions = [];
+let allNotes;
+let currentLayout = "1";
 
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
@@ -131,8 +133,13 @@ async function createMelodyList() {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => {
-      const [file, description, transpose] = line.split("|");
-      return { file, description, transpose: parseInt(transpose, 10) || 0 };
+      const [file, description, transpose, layout] = line.split("|");
+      return {
+        file,
+        description,
+        transpose: parseInt(transpose, 10) || 0,
+        layout: layout || "1",
+      };
     });
 
   const ul = document.createElement("ul");
@@ -142,6 +149,7 @@ async function createMelodyList() {
     li.textContent = melodyItem.description;
     li.dataset.file = melodyItem.file;
     li.dataset.transpose = melodyItem.transpose;
+    li.dataset.layout = melodyItem.layout;
     li.addEventListener("click", async () => {
       if (selectedMelodyFile === melodyItem.file) {
         // If the same melody is clicked again, deselect it
@@ -150,6 +158,10 @@ async function createMelodyList() {
         currentNoteIndex = 0;
         li.classList.remove("selected");
         stopMelodyDemo();
+        if (currentLayout !== "1") {
+          clearPiano();
+          buildPiano(allNotes, "1");
+        }
         return;
       }
 
@@ -160,6 +172,12 @@ async function createMelodyList() {
         item.classList.remove("selected"),
       );
       li.classList.add("selected");
+
+      const layout = melodyItem.layout;
+      if (layout !== currentLayout) {
+        clearPiano();
+        buildPiano(allNotes, layout);
+      }
 
       await loadMelody(melodyItem.file, melodyItem.transpose);
       playMelodyDemo();
@@ -216,14 +234,19 @@ playButton.addEventListener("click", async () => {
   overlay.style.display = "none";
   stopMelodyDemo();
   if (selectedMelodyFile) {
-    playbackState = "PLAY";
     const selectedMelodyLi = melodiesContainer.querySelector(
       `[data-file="${selectedMelodyFile}"]`,
     );
     const transpose = parseInt(selectedMelodyLi.dataset.transpose, 10) || 0;
+
+    playbackState = "PLAY";
     await loadMelody(selectedMelodyFile, transpose);
     startPlayMode();
   } else {
+    if (currentLayout !== "1") {
+      clearPiano();
+      buildPiano(allNotes, "1");
+    }
     playbackState = "PLAY";
     melody = [];
     currentNoteIndex = 0;
@@ -234,7 +257,8 @@ createMelodyList();
 
 // Pre-cache sounds and then build the scene
 cacheAllNoteSounds().then((notes) => {
-  buildAndInitScene(notes);
+  allNotes = notes;
+  initScene(notes);
 });
 // --- End of Overlay Setup ---
 
@@ -333,7 +357,170 @@ function handlePointerUp(pointerId) {
   }
 }
 
-function buildAndInitScene(notes) {
+function clearPiano() {
+  while (pianoGroup.children.length > 0) {
+    const child = pianoGroup.children[0];
+    pianoGroup.remove(child);
+    if (child.geometry) {
+      child.geometry.dispose();
+    }
+    if (child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach((m) => m.dispose());
+      } else {
+        child.material.dispose();
+      }
+    }
+  }
+
+  hitboxMap.clear();
+  noteMap.clear();
+  noteToHitboxMap.clear();
+  keyState.clear();
+  activePointers.clear();
+  activeNoteGainNodes.clear();
+  originalMaterials.clear();
+  hitboxKeys = [];
+  cameraWaypoints = [];
+  chunkYPositions = [];
+}
+
+function onWindowResize() {
+  updateCamera();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updatePianoOrientation();
+}
+
+function updatePianoOrientation() {
+  if (window.innerHeight > window.innerWidth) {
+    // Portrait mode
+    pianoGroup.position.x = -0.25;
+    pianoGroup.position.z = 0;
+    pianoGroup.rotation.y = -Math.PI / 2;
+    camera.up.set(0, 0, -1);
+  } else {
+    // Landscape mode
+    pianoGroup.position.x = 0;
+    pianoGroup.position.z = 0.25;
+    pianoGroup.rotation.y = 0;
+    camera.up.set(0, 1, 0);
+  }
+  updateTargetHandles();
+  camera.position.copy(targetCameraPosition);
+  camera.lookAt(cameraLookAt);
+}
+
+function onPointerDown(event) {
+  if (event.type === "mousedown") {
+    handlePointerDown("mouse", event.clientX, event.clientY);
+    touchStartX = event.clientX;
+    touchStartY = event.clientY;
+  } else {
+    // Touch events
+    event.preventDefault();
+    for (const touch of event.changedTouches) {
+      handlePointerDown(touch.identifier, touch.clientX, touch.clientY);
+    }
+    if (event.touches.length === 1) {
+      touchStartX = event.touches[0].clientX;
+      touchStartY = event.touches[0].clientY;
+    }
+  }
+}
+
+function onPointerMove(event) {
+  let clientX, clientY;
+  if (event.type === "mousemove" && event.buttons === 1) {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  } else if (event.type === "touchmove") {
+    if (event.touches.length > 1) {
+      return;
+    }
+    event.preventDefault();
+    clientX = event.changedTouches[0].clientX;
+    clientY = event.changedTouches[0].clientY;
+  } else {
+    return;
+  }
+
+  const deltaX = clientX - touchStartX;
+  const deltaY = clientY - touchStartY;
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const previousWaypointIndex = currentWaypointIndex;
+
+  if (isPortrait) {
+    if (
+      Math.abs(deltaX) > swipeThreshold &&
+      Math.abs(deltaX) > Math.abs(deltaY)
+    ) {
+      if (deltaX < 0) {
+        currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
+      } else {
+        currentWaypointIndex = Math.min(
+          cameraWaypoints.length - 1,
+          currentWaypointIndex + 1,
+        );
+      }
+    }
+  } else {
+    if (
+      Math.abs(deltaY) > swipeThreshold &&
+      Math.abs(deltaY) > Math.abs(deltaX)
+    ) {
+      if (deltaY > 0) {
+        currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
+      } else {
+        currentWaypointIndex = Math.min(
+          cameraWaypoints.length - 1,
+          currentWaypointIndex + 1,
+        );
+      }
+    }
+  }
+
+  if (previousWaypointIndex != currentWaypointIndex) {
+    touchStartX = clientX;
+    touchStartY = clientY;
+    updateTargetHandles();
+  }
+}
+
+function onPointerUp(event) {
+  if (event.type === "mouseup") {
+    handlePointerUp("mouse");
+  } else {
+    // Touch events
+    event.preventDefault();
+    for (const touch of event.changedTouches) {
+      handlePointerUp(touch.identifier);
+    }
+    if (event.touches.length === 1) {
+      touchStartX = event.touches[0].clientX;
+      touchStartY = event.touches[0].clientY;
+    }
+  }
+}
+
+function initScene(notes) {
+  buildPiano(notes, "1");
+
+  window.addEventListener("resize", onWindowResize, false);
+  renderer.domElement.addEventListener("mousedown", onPointerDown, false);
+  renderer.domElement.addEventListener("mouseup", onPointerUp, false);
+  renderer.domElement.addEventListener("mousemove", onPointerMove, false);
+  renderer.domElement.addEventListener("touchstart", onPointerDown, false);
+  renderer.domElement.addEventListener("touchend", onPointerUp, false);
+  renderer.domElement.addEventListener("touchmove", onPointerMove, false);
+  renderer.domElement.addEventListener("touchcancel", onPointerUp, false);
+
+  raycaster = new THREE.Raycaster();
+
+  animate();
+}
+
+function buildPiano(notes, layout = "1") {
+  currentLayout = layout;
   const whiteKeyLength = 2.5;
   const blackKeyLength = 1.25;
   const whiteKeyRenderGeometry = new RoundedBoxGeometry(
@@ -368,7 +555,9 @@ function buildAndInitScene(notes) {
   const allNoteNames = Object.keys(notes);
   const whiteKeyXPositions = new Map();
 
-  const chunkStartNotes = ["A0", "F1", "F3", "F5", "F7"];
+  const chunkStartNotes1 = ["A0", "F1", "F3", "F5", "F7"];
+  const chunkStartNotes2 = ["A0", "F2", "F4", "F6"];
+  const chunkStartNotes = layout === "2" ? chunkStartNotes2 : chunkStartNotes1;
   const noteChunks = [];
 
   for (let i = 0; i < chunkStartNotes.length; i++) {
@@ -487,139 +676,8 @@ function buildAndInitScene(notes) {
   directionalLight.position.set(3, 6, -3);
   pianoGroup.add(directionalLight);
 
-  window.addEventListener("resize", onWindowResize, false);
-
-  function onWindowResize() {
-    updateCamera();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    updatePianoOrientation();
-  }
-
-  function updatePianoOrientation() {
-    if (window.innerHeight > window.innerWidth) {
-      // Portrait mode
-      pianoGroup.position.x = -0.25;
-      pianoGroup.position.z = 0;
-      pianoGroup.rotation.y = -Math.PI / 2;
-      camera.up.set(0, 0, -1);
-    } else {
-      // Landscape mode
-      pianoGroup.position.x = 0;
-      pianoGroup.position.z = 0.25;
-      pianoGroup.rotation.y = 0;
-      camera.up.set(0, 1, 0);
-    }
-    updateTargetHandles();
-    camera.position.copy(targetCameraPosition);
-    camera.lookAt(cameraLookAt);
-  }
-
   // Initial call to set correct orientation on load
   updatePianoOrientation();
-
-  raycaster = new THREE.Raycaster();
-
-  function onPointerDown(event) {
-    if (event.type === "mousedown") {
-      handlePointerDown("mouse", event.clientX, event.clientY);
-      touchStartX = event.clientX;
-      touchStartY = event.clientY;
-    } else {
-      // Touch events
-      event.preventDefault();
-      for (const touch of event.changedTouches) {
-        handlePointerDown(touch.identifier, touch.clientX, touch.clientY);
-      }
-      if (event.touches.length === 1) {
-        touchStartX = event.touches[0].clientX;
-        touchStartY = event.touches[0].clientY;
-      }
-    }
-  }
-
-  function onPointerMove(event) {
-    let clientX, clientY;
-    if (event.type === "mousemove" && event.buttons === 1) {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    } else if (event.type === "touchmove") {
-      if (event.touches.length > 1) {
-        return;
-      }
-      event.preventDefault();
-      clientX = event.changedTouches[0].clientX;
-      clientY = event.changedTouches[0].clientY;
-    } else {
-      return;
-    }
-
-    const deltaX = clientX - touchStartX;
-    const deltaY = clientY - touchStartY;
-    const isPortrait = window.innerHeight > window.innerWidth;
-    const previousWaypointIndex = currentWaypointIndex;
-
-    if (isPortrait) {
-      if (
-        Math.abs(deltaX) > swipeThreshold &&
-        Math.abs(deltaX) > Math.abs(deltaY)
-      ) {
-        if (deltaX < 0) {
-          currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
-        } else {
-          currentWaypointIndex = Math.min(
-            cameraWaypoints.length - 1,
-            currentWaypointIndex + 1,
-          );
-        }
-      }
-    } else {
-      if (
-        Math.abs(deltaY) > swipeThreshold &&
-        Math.abs(deltaY) > Math.abs(deltaX)
-      ) {
-        if (deltaY > 0) {
-          currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
-        } else {
-          currentWaypointIndex = Math.min(
-            cameraWaypoints.length - 1,
-            currentWaypointIndex + 1,
-          );
-        }
-      }
-    }
-
-    if (previousWaypointIndex != currentWaypointIndex) {
-      touchStartX = clientX;
-      touchStartY = clientY;
-      updateTargetHandles();
-    }
-  }
-
-  function onPointerUp(event) {
-    if (event.type === "mouseup") {
-      handlePointerUp("mouse");
-    } else {
-      // Touch events
-      event.preventDefault();
-      for (const touch of event.changedTouches) {
-        handlePointerUp(touch.identifier);
-      }
-      if (event.touches.length === 1) {
-        touchStartX = event.touches[0].clientX;
-        touchStartY = event.touches[0].clientY;
-      }
-    }
-  }
-
-  renderer.domElement.addEventListener("mousedown", onPointerDown, false);
-  renderer.domElement.addEventListener("mouseup", onPointerUp, false);
-  renderer.domElement.addEventListener("mousemove", onPointerMove, false);
-  renderer.domElement.addEventListener("touchstart", onPointerDown, false);
-  renderer.domElement.addEventListener("touchend", onPointerUp, false);
-  renderer.domElement.addEventListener("touchmove", onPointerMove, false);
-  renderer.domElement.addEventListener("touchcancel", onPointerUp, false);
-
-  animate();
 }
 
 let demoNoteTimeouts = [];

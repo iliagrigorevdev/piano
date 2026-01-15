@@ -1,5 +1,5 @@
 # Each line in this file represents a melody that can be played.
-# The format is: <file-name.mid>|<display-name>|<transpose>
+# The format is: <file-name.mid>|<display-name>|<transpose>|<layout>
 #
 # - file-name.mid: The name of the MIDI file in the 'melodies' directory.
 # - display-name: The name that will be shown in the UI.
@@ -8,4 +8,4 @@
 #   and a value of -1 will transpose it one semitone down.
 #   The default value is 0.
 
-k-pop-demon-hunters-how-it-done.mid|K-Pop Demon Hunters - How It's Done|0
+k-pop-demon-hunters-how-it-done.mid|K-Pop Demon Hunters - How It's Done|0|1
