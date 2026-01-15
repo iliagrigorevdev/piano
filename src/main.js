@@ -81,14 +81,10 @@ let touchStartX = 0;
 let touchStartY = 0;
 const swipeThreshold = 50; // Minimum distance for a swipe
 
-const lookAtPoints = [
-  new THREE.Vector3(0, 0, -3.75),
-  new THREE.Vector3(0, 0, -1.25),
-  new THREE.Vector3(0, 0, 1.25),
-  new THREE.Vector3(0, 0, 3.75),
-];
-let currentLookAtIndex = 1;
-let targetLookAt = lookAtPoints[currentLookAtIndex].clone();
+let cameraWaypoints = [];
+let currentWaypointIndex = 0;
+let targetCameraPosition = new THREE.Vector3();
+const cameraLookAt = new THREE.Vector3();
 
 function updateCamera() {
   const maxDimension = Math.max(window.innerWidth, window.innerHeight);
@@ -102,6 +98,18 @@ function updateCamera() {
   camera.fov =
     camera.aspect < 1 ? fov : calculateVerticalFOV(fov, camera.aspect);
   camera.updateProjectionMatrix();
+}
+
+function updateTargetHandles() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const z = cameraWaypoints[currentWaypointIndex];
+  if (isPortrait) {
+    targetCameraPosition.set(-z - 15, 30, 0);
+    cameraLookAt.set(-z, 0, 0);
+  } else {
+    targetCameraPosition.set(0, 30, z + 15);
+    cameraLookAt.set(0, 0, z);
+  }
 }
 
 // Initial camera setup
@@ -375,6 +383,14 @@ function buildAndInitScene(notes) {
     noteChunks.push(noteChunk);
   }
 
+  cameraWaypoints = [];
+  const numWaypoints = noteChunks.length - 1;
+  for (let i = 0; i < numWaypoints; i++) {
+    const waypointZ = (i + 0.5 - numWaypoints / 2) * whiteKeyLength;
+    cameraWaypoints.push(waypointZ);
+  }
+  currentWaypointIndex = Math.floor((numWaypoints - 1) / 2);
+
   const maxWhiteKeys = Math.max(
     ...noteChunks.map((c) => c.filter((n) => !n.includes("#")).length),
   );
@@ -481,16 +497,16 @@ function buildAndInitScene(notes) {
       pianoGroup.position.z = 0;
       pianoGroup.rotation.y = -Math.PI / 2;
       camera.up.set(0, 0, -1);
-      camera.position.set(-15, 30, 0);
     } else {
       // Landscape mode
       pianoGroup.position.x = 0;
       pianoGroup.position.z = 0.2;
       pianoGroup.rotation.y = 0;
       camera.up.set(0, 1, 0);
-      camera.position.set(0, 30, 15);
     }
-    camera.lookAt(getWorldTarget());
+    updateTargetHandles();
+    camera.position.copy(targetCameraPosition);
+    camera.lookAt(cameraLookAt);
   }
 
   // Initial call to set correct orientation on load
@@ -535,7 +551,7 @@ function buildAndInitScene(notes) {
     const deltaX = clientX - touchStartX;
     const deltaY = clientY - touchStartY;
     const isPortrait = window.innerHeight > window.innerWidth;
-    const previousLookAtIndex = currentLookAtIndex;
+    const previousWaypointIndex = currentWaypointIndex;
 
     if (isPortrait) {
       if (
@@ -543,11 +559,11 @@ function buildAndInitScene(notes) {
         Math.abs(deltaX) > Math.abs(deltaY)
       ) {
         if (deltaX < 0) {
-          currentLookAtIndex = Math.max(0, currentLookAtIndex - 1);
+          currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
         } else {
-          currentLookAtIndex = Math.min(
-            lookAtPoints.length - 1,
-            currentLookAtIndex + 1,
+          currentWaypointIndex = Math.min(
+            cameraWaypoints.length - 1,
+            currentWaypointIndex + 1,
           );
         }
       }
@@ -557,20 +573,20 @@ function buildAndInitScene(notes) {
         Math.abs(deltaY) > Math.abs(deltaX)
       ) {
         if (deltaY > 0) {
-          currentLookAtIndex = Math.max(0, currentLookAtIndex - 1);
+          currentWaypointIndex = Math.max(0, currentWaypointIndex - 1);
         } else {
-          currentLookAtIndex = Math.min(
-            lookAtPoints.length - 1,
-            currentLookAtIndex + 1,
+          currentWaypointIndex = Math.min(
+            cameraWaypoints.length - 1,
+            currentWaypointIndex + 1,
           );
         }
       }
     }
 
-    if (previousLookAtIndex != currentLookAtIndex) {
+    if (previousWaypointIndex != currentWaypointIndex) {
       touchStartX = clientX;
       touchStartY = clientY;
-      targetLookAt.copy(lookAtPoints[currentLookAtIndex]);
+      updateTargetHandles();
     }
   }
 
@@ -739,23 +755,8 @@ unhighlightKey = function (noteToUnhighlight) {
   }
 };
 
-function getWorldTarget() {
-  return camera.up.z === -1
-    ? new THREE.Vector3(-targetLookAt.z, targetLookAt.y, targetLookAt.x)
-    : targetLookAt;
-}
-
 function animateToTarget() {
-  const worldTarget = getWorldTarget();
-
-  let currentDir = new THREE.Vector3();
-  camera.getWorldDirection(currentDir);
-  let targetDir = new THREE.Vector3()
-    .subVectors(worldTarget, camera.position)
-    .normalize();
-
-  let newDir = new THREE.Vector3().lerpVectors(currentDir, targetDir, 0.1);
-  camera.lookAt(camera.position.clone().add(newDir));
+  camera.position.lerp(targetCameraPosition, 0.1);
 }
 
 function animate() {
