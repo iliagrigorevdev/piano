@@ -29,6 +29,27 @@ canvas {
   cursor: pointer;
 }
 
+#layout-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: white;
+  margin: 10px;
+  font-family: sans-serif;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio-label input {
+  cursor: pointer;
+}
+
 #melodies-container {
   color: white;
   margin: 20px;

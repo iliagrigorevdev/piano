@@ -18,6 +18,7 @@ This is a web-based 3D piano application. It features a responsive design, reali
 - **Responsive Camera System**:
   - Automatically adjusts Field of View (FOV) for portrait and landscape orientations.
   - **Swipe Navigation**: The keyboard is divided into viewable "chunks." Swipe or drag to move the camera up and down the octaves.
+  - **Layout Switching**: Manually toggle between different key layouts (Type 1 / Type 2) via the main menu to adjust camera focus points.
 - **Visual Effects**: Particle celebration effects upon completing a melody.
 - **PWA Support**: Installable as a Progressive Web App.
 
@@ -27,6 +28,7 @@ This is a web-based 3D piano application. It features a responsive design, reali
 
 - **Play Note**: Click or tap on a key.
 - **Move Camera**: Click and drag (desktop) or swipe (mobile) horizontally (in portrait) or vertically (in landscape) to access different octaves of the piano.
+- **Change Layout**: Use the "Layout" radio buttons in the main menu to switch between key grouping types.
 
 ### Selecting a Melody
 

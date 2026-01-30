@@ -125,6 +125,41 @@ const overlay = document.querySelector("#overlay");
 const playButton = document.querySelector("#play-button");
 const melodiesContainer = document.querySelector("#melodies-container");
 
+// -- Layout Selector UI --
+const layoutControls = document.createElement("div");
+layoutControls.id = "layout-controls";
+layoutControls.innerHTML = `
+  <span>Layout:</span>
+  <label class="radio-label">
+    <input type="radio" name="layout" value="1" checked>
+    Type 1
+  </label>
+  <label class="radio-label">
+    <input type="radio" name="layout" value="2">
+    Type 2
+  </label>
+`;
+// Insert layout controls before the melodies container
+melodiesContainer.parentNode.insertBefore(layoutControls, melodiesContainer);
+
+// Handle Layout Change
+layoutControls.addEventListener("change", (e) => {
+  if (e.target.name === "layout") {
+    const newLayout = e.target.value;
+    if (newLayout !== currentLayout && allNotes) {
+      currentLayout = newLayout;
+      clearPiano();
+      buildPiano(allNotes, currentLayout);
+
+      // If a demo is currently playing, we need to restart it
+      // so highlights attach to the new 3D meshes
+      if (isDemoPlaying && selectedMelodyFile) {
+        playMelodyDemo();
+      }
+    }
+  }
+});
+
 // Create Load Button and Hidden Input
 const loadInput = document.createElement("input");
 loadInput.type = "file";
@@ -154,7 +189,7 @@ loadInput.addEventListener("change", (e) => {
       file: file, // Store the File object directly
       description: file.name.replace(/\.midi?$/i, ""),
       transpose: 0,
-      layout: "1",
+      layout: null,
     }));
 
     renderMelodyList(melodyObjects);
@@ -178,7 +213,7 @@ async function createMelodyList() {
             file,
             description,
             transpose: parseInt(transpose, 10) || 0,
-            layout: layout || "1",
+            layout: layout ? layout.trim() : null,
           };
         });
     }
@@ -207,7 +242,9 @@ function renderMelodyList(melodies) {
 
     // Store metadata on the element for easy access
     li.dataset.transpose = melodyItem.transpose;
-    li.dataset.layout = melodyItem.layout;
+    if (melodyItem.layout) {
+      li.dataset.layout = melodyItem.layout;
+    }
 
     // For file objects, we can't use dataset for the file itself,
     // so we attach it to the DOM property.
@@ -221,10 +258,7 @@ function renderMelodyList(melodies) {
         currentNoteIndex = 0;
         li.classList.remove("selected");
         stopMelodyDemo();
-        if (currentLayout !== "1") {
-          clearPiano();
-          buildPiano(allNotes, "1");
-        }
+        // Do not revert layout automatically on deselect to avoid jarring visual changes
         return;
       }
 
@@ -237,9 +271,20 @@ function renderMelodyList(melodies) {
       li.classList.add("selected");
 
       const layout = melodyItem.layout;
-      if (layout !== currentLayout) {
-        clearPiano();
-        buildPiano(allNotes, layout);
+
+      // Only change layout if the melody explicitly defines one
+      if (layout) {
+        // Update the Radio Button UI to match the song's default
+        const layoutRadio = document.querySelector(
+          `input[name="layout"][value="${layout}"]`,
+        );
+        if (layoutRadio) layoutRadio.checked = true;
+
+        // Rebuild piano if layout changed
+        if (layout !== currentLayout) {
+          clearPiano();
+          buildPiano(allNotes, layout);
+        }
       }
 
       await loadMelody(melodyItem.file, melodyItem.transpose);
@@ -326,10 +371,8 @@ playButton.addEventListener("click", async () => {
     await loadMelody(selectedMelodyFile, transpose);
     startPlayMode();
   } else {
-    if (currentLayout !== "1") {
-      clearPiano();
-      buildPiano(allNotes, "1");
-    }
+    // No melody selected (Free play).
+    // We keep whatever layout the user has currently selected via the radio buttons.
     playbackState = "PLAY";
     melody = [];
     currentNoteIndex = 0;
