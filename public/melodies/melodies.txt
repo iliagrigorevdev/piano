@@ -8,4 +8,3 @@
 #   and a value of -1 will transpose it one semitone down.
 #   The default value is 0.
 
-k-pop-demon-hunters-how-it-done.mid|K-Pop Demon Hunters - How It's Done|0|1

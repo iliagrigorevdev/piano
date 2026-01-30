@@ -142,6 +142,12 @@ async function createMelodyList() {
       };
     });
 
+  if (melodies.length === 0) {
+    melodiesContainer.style.display = "none";
+    return;
+  }
+  melodiesContainer.style.display = "block";
+
   const ul = document.createElement("ul");
 
   melodies.forEach((melodyItem) => {
