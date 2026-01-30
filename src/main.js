@@ -125,37 +125,94 @@ const overlay = document.querySelector("#overlay");
 const playButton = document.querySelector("#play-button");
 const melodiesContainer = document.querySelector("#melodies-container");
 
+// Create Load Button and Hidden Input
+const loadInput = document.createElement("input");
+loadInput.type = "file";
+loadInput.webkitdirectory = true;
+loadInput.multiple = true;
+loadInput.accept = ".mid,.midi";
+loadInput.style.display = "none";
+document.body.appendChild(loadInput);
+
+const loadButton = document.createElement("button");
+loadButton.textContent = "Load";
+loadButton.id = "load-button";
+loadButton.style.display = "none";
+playButton.insertAdjacentElement("afterend", loadButton);
+
+loadButton.addEventListener("click", () => loadInput.click());
+
+loadInput.addEventListener("change", (e) => {
+  const files = Array.from(e.target.files).filter(
+    (f) =>
+      f.name.toLowerCase().endsWith(".mid") ||
+      f.name.toLowerCase().endsWith(".midi"),
+  );
+
+  if (files.length > 0) {
+    const melodyObjects = files.map((file) => ({
+      file: file, // Store the File object directly
+      description: file.name.replace(/\.midi?$/i, ""),
+      transpose: 0,
+      layout: "1",
+    }));
+
+    renderMelodyList(melodyObjects);
+    loadButton.style.display = "none";
+  }
+});
+
 async function createMelodyList() {
-  const response = await fetch("melodies/melodies.txt");
-  const text = await response.text();
-  const melodies = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const [file, description, transpose, layout] = line.split("|");
-      return {
-        file,
-        description,
-        transpose: parseInt(transpose, 10) || 0,
-        layout: layout || "1",
-      };
-    });
+  let melodies = [];
+  try {
+    const response = await fetch("melodies/melodies.txt");
+    if (response.ok) {
+      const text = await response.text();
+      melodies = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#"))
+        .map((line) => {
+          const [file, description, transpose, layout] = line.split("|");
+          return {
+            file,
+            description,
+            transpose: parseInt(transpose, 10) || 0,
+            layout: layout || "1",
+          };
+        });
+    }
+  } catch (e) {
+    console.warn("Could not load default melodies list.");
+  }
 
   if (melodies.length === 0) {
     melodiesContainer.style.display = "none";
+    loadButton.style.display = "block"; // Show load button if no default melodies
     return;
   }
+
+  renderMelodyList(melodies);
+}
+
+function renderMelodyList(melodies) {
   melodiesContainer.style.display = "block";
+  melodiesContainer.innerHTML = ""; // Clear existing
 
   const ul = document.createElement("ul");
 
   melodies.forEach((melodyItem) => {
     const li = document.createElement("li");
     li.textContent = melodyItem.description;
-    li.dataset.file = melodyItem.file;
+
+    // Store metadata on the element for easy access
     li.dataset.transpose = melodyItem.transpose;
     li.dataset.layout = melodyItem.layout;
+
+    // For file objects, we can't use dataset for the file itself,
+    // so we attach it to the DOM property.
+    li._melodyFile = melodyItem.file;
+
     li.addEventListener("click", async () => {
       if (selectedMelodyFile === melodyItem.file) {
         // If the same melody is clicked again, deselect it
@@ -194,9 +251,21 @@ async function createMelodyList() {
   melodiesContainer.appendChild(ul);
 }
 
-async function loadMelody(melodyFile, transpose = 0) {
-  const response = await fetch(`melodies/${melodyFile}`);
-  const midiData = await response.arrayBuffer();
+async function loadMelody(melodySource, transpose = 0) {
+  let midiData;
+
+  if (typeof melodySource === "string") {
+    // It's a path from melodies.txt
+    const response = await fetch(`melodies/${melodySource}`);
+    midiData = await response.arrayBuffer();
+  } else if (melodySource instanceof File) {
+    // It's a user-uploaded File object
+    midiData = await melodySource.arrayBuffer();
+  } else {
+    console.error("Invalid melody source");
+    return;
+  }
+
   const midi = new Midi(midiData);
 
   midi.tracks.forEach((track) => {
@@ -240,10 +309,18 @@ playButton.addEventListener("click", async () => {
   overlay.style.display = "none";
   stopMelodyDemo();
   if (selectedMelodyFile) {
-    const selectedMelodyLi = melodiesContainer.querySelector(
-      `[data-file="${selectedMelodyFile}"]`,
+    // Find the selected LI to get metadata like transpose
+    let transpose = 0;
+
+    // We iterate to find the matching LI because selectedMelodyFile can be a String or a File object
+    const listItems = Array.from(melodiesContainer.querySelectorAll("li"));
+    const selectedLi = listItems.find(
+      (li) => li._melodyFile === selectedMelodyFile,
     );
-    const transpose = parseInt(selectedMelodyLi.dataset.transpose, 10) || 0;
+
+    if (selectedLi) {
+      transpose = parseInt(selectedLi.dataset.transpose, 10) || 0;
+    }
 
     playbackState = "PLAY";
     await loadMelody(selectedMelodyFile, transpose);

@@ -11,6 +11,7 @@ This is a web-based 3D piano application. It features a responsive design, reali
 - **3D Piano Model**: A fully interactive piano with 3D keys, rendered using Three.js.
 - **Realistic Audio**: Uses the Web Audio API with SFZ-based sampling (Salamander Grand Piano) for high-quality sound.
 - **MIDI Integration**: Loads melodies directly from MIDI files using `@tonejs/midi`.
+- **Custom MIDI Support**: Ability to load a local folder of MIDI files directly in the browser if no default configuration is found.
 - **Interactive Modes**:
   - **Demo Mode**: Preview melodies automatically with visual key highlights.
   - **Play Mode**: Learn a song by playing along. The game waits for you to hit the correct highlighted note before advancing.
@@ -36,11 +37,19 @@ This is a web-based 3D piano application. It features a responsive design, reali
 ### Learning a Song (Play Mode)
 
 1. Select a melody from the list.
-2. Click the **"Start"** button at the top of the overlay.
+2. Click the **"Play"** button at the top of the overlay.
 3. The overlay will disappear. The first note of the melody will light up (Blue for Right Hand, Purple for Left Hand).
 4. Press the highlighted key to play the note. The system will wait for you.
 5. Once the correct key is pressed, the guide advances to the next note.
 6. Complete the song to trigger the victory effect!
+
+### Loading Local MIDI Files
+
+If the application cannot find the default melody list (or if you are running it locally without setting one up), a **"Load"** button will appear next to the Play button.
+
+1. Click **"Load"**.
+2. Select a local folder containing `.mid` or `.midi` files.
+3. The application will generate a playlist from your files.
 
 ## Development
 
@@ -80,6 +89,8 @@ This will create a `dist` folder with the bundled files, ready for deployment.
 
 ## Adding New Melodies
 
+### Method 1: Configuration File (Default)
+
 1. Place your `.mid` file in the `public/melodies/` directory.
 2. Update `public/melodies/melodies.txt`.
 3. Add a new line in the following format:
@@ -88,6 +99,10 @@ This will create a `dist` folder with the bundled files, ready for deployment.
    - **Display Title**: The name shown in the UI.
    - **TransposeValue**: Integer to shift pitch (e.g., `0`, `12`, `-12`).
    - **LayoutID**: Usually `"1"` or `"2"` (defines how keys are grouped for the camera view).
+
+### Method 2: Local Loading
+
+If you delete or rename `melodies.txt`, the application will default to the "Load" button state, allowing you to drag and drop or select a folder of MIDI files from your computer to play instantly.
 
 ## Credits & Licenses
 
