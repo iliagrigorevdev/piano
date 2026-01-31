@@ -19,6 +19,7 @@ This is a web-based 3D piano application. It features a responsive design, reali
   - Automatically adjusts Field of View (FOV) for portrait and landscape orientations.
   - **Swipe Navigation**: The keyboard is divided into viewable "chunks." Swipe or drag to move the camera up and down the octaves.
   - **Layout Switching**: Manually toggle between different key layouts (Type 1 / Type 2) via the main menu to adjust camera focus points.
+- **Transposition**: Adjust the pitch of any selected melody up or down by semitones directly from the UI.
 - **Visual Effects**: Particle celebration effects upon completing a melody.
 - **PWA Support**: Installable as a Progressive Web App.
 
@@ -34,16 +35,18 @@ This is a web-based 3D piano application. It features a responsive design, reali
 
 1. Upon loading, you will see an overlay menu.
 2. Click on a song title from the list to preview it in **Demo Mode**. The piano will play the song automatically, highlighting the keys.
-3. Click the song again to stop the preview.
+3. **Transpose**: If a song is too high or low, use the **+** and **-** buttons above the song list to shift the pitch. The preview will update instantly.
+4. Click the song again to stop the preview.
 
 ### Learning a Song (Play Mode)
 
 1. Select a melody from the list.
-2. Click the **"Play"** button at the top of the overlay.
-3. The overlay will disappear. The first note of the melody will light up (Blue for Right Hand, Purple for Left Hand).
-4. Press the highlighted key to play the note. The system will wait for you.
-5. Once the correct key is pressed, the guide advances to the next note.
-6. Complete the song to trigger the victory effect!
+2. Adjust the transposition if desired.
+3. Click the **"Play"** button at the top of the overlay.
+4. The overlay will disappear. The first note of the melody will light up (Blue for Right Hand, Purple for Left Hand).
+5. Press the highlighted key to play the note. The system will wait for you.
+6. Once the correct key is pressed, the guide advances to the next note.
+7. Complete the song to trigger the victory effect!
 
 ### Loading Local MIDI Files
 
@@ -99,7 +102,7 @@ This will create a `dist` folder with the bundled files, ready for deployment.
    `filename.mid|Display Title|TransposeValue|LayoutID`
    - **filename.mid**: The name of your MIDI file.
    - **Display Title**: The name shown in the UI.
-   - **TransposeValue**: Integer to shift pitch (e.g., `0`, `12`, `-12`).
+   - **TransposeValue**: Integer to shift pitch (e.g., `0`, `12`, `-12`). This sets the _default_ transposition, but the user can still adjust it in the UI.
    - **LayoutID**: Usually `"1"` or `"2"` (defines how keys are grouped for the camera view).
 
 ### Method 2: Local Loading

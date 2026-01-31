@@ -66,6 +66,7 @@ const pressedHighlightMaterial = new THREE.MeshStandardMaterial({
 let playbackState = "DEMO"; // "DEMO" or "PLAY"
 let isDemoPlaying = false;
 let selectedMelodyFile = null;
+let currentTranspose = 0; // State for current transposition
 let isMelodyFinishing = false;
 let demoPlayingNotes = new Map();
 
@@ -125,6 +126,12 @@ const overlay = document.querySelector("#overlay");
 const playButton = document.querySelector("#play-button");
 const melodiesContainer = document.querySelector("#melodies-container");
 
+// -- Controls Container --
+const controlsRow = document.createElement("div");
+controlsRow.id = "controls-row";
+// Insert before melodies container
+melodiesContainer.parentNode.insertBefore(controlsRow, melodiesContainer);
+
 // -- Layout Selector UI --
 const layoutControls = document.createElement("div");
 layoutControls.id = "layout-controls";
@@ -139,8 +146,41 @@ layoutControls.innerHTML = `
     Type 2
   </label>
 `;
-// Insert layout controls before the melodies container
-melodiesContainer.parentNode.insertBefore(layoutControls, melodiesContainer);
+controlsRow.appendChild(layoutControls);
+
+// -- Transpose Controls UI --
+const transposeControls = document.createElement("div");
+transposeControls.id = "transpose-controls";
+transposeControls.innerHTML = `
+  <span>Transpose:</span>
+  <button id="transpose-down" class="control-btn" disabled>-</button>
+  <span id="transpose-value">0</span>
+  <button id="transpose-up" class="control-btn" disabled>+</button>
+`;
+controlsRow.appendChild(transposeControls);
+
+const btnTransposeDown = transposeControls.querySelector("#transpose-down");
+const btnTransposeUp = transposeControls.querySelector("#transpose-up");
+const displayTranspose = transposeControls.querySelector("#transpose-value");
+
+async function updateTranspose(change) {
+  if (!selectedMelodyFile) return;
+
+  currentTranspose += change;
+  displayTranspose.textContent =
+    currentTranspose > 0 ? `+${currentTranspose}` : currentTranspose;
+
+  // Reload the melody with the new transpose value
+  await loadMelody(selectedMelodyFile, currentTranspose);
+
+  // If we are currently previewing (Demo Mode), restart the demo to hear changes
+  if (isDemoPlaying) {
+    playMelodyDemo();
+  }
+}
+
+btnTransposeDown.addEventListener("click", () => updateTranspose(-1));
+btnTransposeUp.addEventListener("click", () => updateTranspose(1));
 
 // Handle Layout Change
 layoutControls.addEventListener("change", (e) => {
@@ -258,11 +298,19 @@ function renderMelodyList(melodies) {
         currentNoteIndex = 0;
         li.classList.remove("selected");
         stopMelodyDemo();
-        // Do not revert layout automatically on deselect to avoid jarring visual changes
+
+        // Disable transpose controls
+        btnTransposeDown.disabled = true;
+        btnTransposeUp.disabled = true;
+        displayTranspose.textContent = "0";
         return;
       }
 
       selectedMelodyFile = melodyItem.file;
+
+      // Enable transpose controls
+      btnTransposeDown.disabled = false;
+      btnTransposeUp.disabled = false;
 
       // Update selection visuals
       ul.querySelectorAll("li").forEach((item) =>
@@ -287,7 +335,12 @@ function renderMelodyList(melodies) {
         }
       }
 
-      await loadMelody(melodyItem.file, melodyItem.transpose);
+      // Initialize transpose from the song's default
+      currentTranspose = melodyItem.transpose;
+      displayTranspose.textContent =
+        currentTranspose > 0 ? `+${currentTranspose}` : currentTranspose;
+
+      await loadMelody(melodyItem.file, currentTranspose);
       playMelodyDemo();
     });
     ul.appendChild(li);
@@ -347,6 +400,11 @@ function showMelodySelection() {
   melodiesContainer
     .querySelectorAll("li")
     .forEach((item) => item.classList.remove("selected"));
+
+  // Reset controls
+  btnTransposeDown.disabled = true;
+  btnTransposeUp.disabled = true;
+  displayTranspose.textContent = "0";
 }
 
 playButton.addEventListener("click", async () => {
@@ -354,25 +412,13 @@ playButton.addEventListener("click", async () => {
   overlay.style.display = "none";
   stopMelodyDemo();
   if (selectedMelodyFile) {
-    // Find the selected LI to get metadata like transpose
-    let transpose = 0;
-
-    // We iterate to find the matching LI because selectedMelodyFile can be a String or a File object
-    const listItems = Array.from(melodiesContainer.querySelectorAll("li"));
-    const selectedLi = listItems.find(
-      (li) => li._melodyFile === selectedMelodyFile,
-    );
-
-    if (selectedLi) {
-      transpose = parseInt(selectedLi.dataset.transpose, 10) || 0;
-    }
-
     playbackState = "PLAY";
-    await loadMelody(selectedMelodyFile, transpose);
+    // Reload one last time with current state to ensure audio context readiness didn't miss anything,
+    // though loadMelody mostly handles data. Using currentTranspose from state.
+    await loadMelody(selectedMelodyFile, currentTranspose);
     startPlayMode();
   } else {
     // No melody selected (Free play).
-    // We keep whatever layout the user has currently selected via the radio buttons.
     playbackState = "PLAY";
     melody = [];
     currentNoteIndex = 0;
@@ -387,7 +433,7 @@ cacheAllNoteSounds().then((notes) => {
   initScene(notes);
 });
 // --- End of Overlay Setup ---
-
+// ... rest of the file (getNoteFromObject, pressKey, etc) remains the same ...
 function getNoteFromObject(object) {
   return noteMap.get(object);
 }
