@@ -1,8 +1,10 @@
 # 3D Piano
 
+![Screenshot](public/screenshot.png)
+
 This is a web-based 3D piano application. It features a responsive design, realistic audio sampling, and an interactive "follow-along" mode that helps users learn melodies loaded from MIDI files.
 
-## Live Demo
+## Run
 
 [**Play the piano here!**](https://iliagrigorevdev.github.io/piano/)
 
