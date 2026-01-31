@@ -200,24 +200,71 @@ layoutControls.addEventListener("change", (e) => {
   }
 });
 
-// Create Load Button and Hidden Input
-const loadInput = document.createElement("input");
-loadInput.type = "file";
-loadInput.webkitdirectory = true;
-loadInput.multiple = true;
-loadInput.accept = ".mid,.midi";
-loadInput.style.display = "none";
-document.body.appendChild(loadInput);
+// -- File Loading Logic --
 
-const loadButton = document.createElement("button");
-loadButton.textContent = "Load";
-loadButton.id = "load-button";
-loadButton.style.display = "none";
-playButton.insertAdjacentElement("afterend", loadButton);
+// 1. Hidden Input for Folders
+const loadFolderInput = document.createElement("input");
+loadFolderInput.type = "file";
+loadFolderInput.webkitdirectory = true;
+loadFolderInput.multiple = true;
+loadFolderInput.style.display = "none";
+document.body.appendChild(loadFolderInput);
 
-loadButton.addEventListener("click", () => loadInput.click());
+// 2. Hidden Input for Files
+const loadFileInput = document.createElement("input");
+loadFileInput.type = "file";
+loadFileInput.multiple = true;
+loadFileInput.accept = ".mid,.midi";
+loadFileInput.style.display = "none";
+document.body.appendChild(loadFileInput);
 
-loadInput.addEventListener("change", (e) => {
+// 3. UI: Single Load Button Container
+const loadContainer = document.createElement("div");
+loadContainer.style.display = "flex";
+loadContainer.style.alignItems = "center";
+loadContainer.style.justifyContent = "center";
+
+// The main "Load" button
+const mainLoadBtn = document.createElement("button");
+mainLoadBtn.textContent = "Load";
+mainLoadBtn.id = "main-load-button";
+
+// The container for options (File | Folder) - initially hidden
+const loadOptionsDiv = document.createElement("div");
+loadOptionsDiv.style.display = "none";
+
+// Sub-button: Files
+const btnLoadFiles = document.createElement("button");
+btnLoadFiles.textContent = "Files";
+btnLoadFiles.style.fontSize = "1.5rem"; // Slightly smaller than main
+btnLoadFiles.style.padding = "0.8rem 1.5rem";
+
+// Sub-button: Folder
+const btnLoadFolder = document.createElement("button");
+btnLoadFolder.textContent = "Folder";
+btnLoadFolder.style.fontSize = "1.5rem";
+btnLoadFolder.style.padding = "0.8rem 1.5rem";
+
+loadOptionsDiv.appendChild(btnLoadFiles);
+loadOptionsDiv.appendChild(btnLoadFolder);
+
+loadContainer.appendChild(mainLoadBtn);
+loadContainer.appendChild(loadOptionsDiv);
+
+// Insert the load container next to the Play button
+playButton.insertAdjacentElement("afterend", loadContainer);
+
+// 4. UI Interaction Logic
+mainLoadBtn.addEventListener("click", () => {
+  mainLoadBtn.style.display = "none";
+  loadOptionsDiv.style.display = "flex";
+});
+
+btnLoadFiles.addEventListener("click", () => loadFileInput.click());
+btnLoadFolder.addEventListener("click", () => loadFolderInput.click());
+
+// 5. Shared File Processing
+const handleFileSelect = (e) => {
   const files = Array.from(e.target.files).filter(
     (f) =>
       f.name.toLowerCase().endsWith(".mid") ||
@@ -233,9 +280,17 @@ loadInput.addEventListener("change", (e) => {
     }));
 
     renderMelodyList(melodyObjects);
-    loadButton.style.display = "none";
+    // Hide the entire load container once files are loaded
+    loadContainer.style.display = "none";
+  } else {
+    // If user cancelled or selected nothing valid, reset UI
+    loadOptionsDiv.style.display = "none";
+    mainLoadBtn.style.display = "block";
   }
-});
+};
+
+loadFolderInput.addEventListener("change", handleFileSelect);
+loadFileInput.addEventListener("change", handleFileSelect);
 
 async function createMelodyList() {
   let melodies = [];
@@ -263,8 +318,14 @@ async function createMelodyList() {
 
   if (melodies.length === 0) {
     melodiesContainer.style.display = "none";
-    loadButton.style.display = "block"; // Show load button if no default melodies
+    // If no default melodies, ensure main load button is visible
+    loadContainer.style.display = "flex";
+    mainLoadBtn.style.display = "block";
+    loadOptionsDiv.style.display = "none";
     return;
+  } else {
+    // If default melodies exist, hide the manual load button
+    loadContainer.style.display = "none";
   }
 
   renderMelodyList(melodies);
@@ -433,7 +494,7 @@ cacheAllNoteSounds().then((notes) => {
   initScene(notes);
 });
 // --- End of Overlay Setup ---
-// ... rest of the file (getNoteFromObject, pressKey, etc) remains the same ...
+
 function getNoteFromObject(object) {
   return noteMap.get(object);
 }

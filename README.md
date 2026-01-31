@@ -11,7 +11,7 @@ This is a web-based 3D piano application. It features a responsive design, reali
 - **3D Piano Model**: A fully interactive piano with 3D keys, rendered using Three.js.
 - **Realistic Audio**: Uses the Web Audio API with SFZ-based sampling (Salamander Grand Piano) for high-quality sound.
 - **MIDI Integration**: Loads melodies directly from MIDI files using `@tonejs/midi`.
-- **Custom MIDI Support**: Ability to load a local folder of MIDI files directly in the browser if no default configuration is found.
+- **Custom MIDI Support**: Ability to load individual `.mid` files or entire folders directly in the browser.
 - **Interactive Modes**:
   - **Demo Mode**: Preview melodies automatically with visual key highlights.
   - **Play Mode**: Learn a song by playing along. The game waits for you to hit the correct highlighted note before advancing.
@@ -50,11 +50,13 @@ This is a web-based 3D piano application. It features a responsive design, reali
 
 ### Loading Local MIDI Files
 
-If the application cannot find the default melody list (or if you are running it locally without setting one up), a **"Load"** button will appear next to the Play button.
+If you want to play your own MIDI files, use the **"Load"** button located next to the Play button.
 
-1. Click **"Load"**.
-2. Select a local folder containing `.mid` or `.midi` files.
-3. The application will generate a playlist from your files.
+1. Click the **"Load"** button.
+2. Choose your preferred method:
+   - **Files**: Select one or multiple specific `.mid` files from your device.
+   - **Folder**: Select an entire directory containing MIDI files.
+3. The application will parse the files and generate a playlist for you to select from.
 
 ## Development
 
@@ -107,7 +109,7 @@ This will create a `dist` folder with the bundled files, ready for deployment.
 
 ### Method 2: Local Loading
 
-If you delete or rename `melodies.txt`, the application will default to the "Load" button state, allowing you to drag and drop or select a folder of MIDI files from your computer to play instantly.
+If you delete or rename `melodies.txt`, or simply want to try new songs without editing the config, use the **Load** button in the UI to import files directly.
 
 ## Credits & Licenses
 
