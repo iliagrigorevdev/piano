@@ -439,7 +439,8 @@ async function loadMelody(melodySource, transpose = 0) {
     .filter((track) => track.notes.length > 0)
     .slice(0, 2);
 
-  melody = tracks.flatMap((track, trackIndex) =>
+  // 1. Flatten into single events
+  const flatMelody = tracks.flatMap((track, trackIndex) =>
     track.notes.map((note) => ({
       note: note.name,
       start: note.time,
@@ -447,7 +448,36 @@ async function loadMelody(melodySource, transpose = 0) {
       track: trackIndex,
     })),
   );
-  melody.sort((a, b) => a.start - b.start);
+  flatMelody.sort((a, b) => a.start - b.start);
+
+  // 2. Group simultaneous notes into chords/steps
+  const groupedMelody = [];
+  if (flatMelody.length > 0) {
+    // Initialize first group
+    let currentGroup = {
+      time: flatMelody[0].start,
+      notes: [flatMelody[0]],
+    };
+
+    for (let i = 1; i < flatMelody.length; i++) {
+      const note = flatMelody[i];
+      // If start time is very close (within 50ms), treat as simultaneous
+      if (note.start - currentGroup.time < 0.05) {
+        currentGroup.notes.push(note);
+      } else {
+        // Push finished group and start new one
+        groupedMelody.push(currentGroup);
+        currentGroup = {
+          time: note.start,
+          notes: [note],
+        };
+      }
+    }
+    // Push final group
+    groupedMelody.push(currentGroup);
+  }
+
+  melody = groupedMelody;
 }
 
 function showMelodySelection() {
@@ -513,20 +543,36 @@ function pressKey(hitbox, pointerId, playAudio = true) {
     if (
       playbackState === "PLAY" &&
       melody.length > 0 &&
-      currentNoteIndex < melody.length &&
-      note === melody[currentNoteIndex].note
+      currentNoteIndex < melody.length
     ) {
-      const playedNoteInfo = melody[currentNoteIndex];
-      const renderKey = hitboxMap.get(hitbox);
-      if (renderKey) {
-        renderKey.material = pressedHighlightMaterial;
-      }
+      // Check if the pressed note is one of the valid notes for the current step
+      const currentStep = melody[currentNoteIndex];
+      const matchedNoteInfo = currentStep.notes.find((n) => n.note === note);
 
-      currentNoteIndex++;
-      setTimeout(() => {
-        unhighlightKey(note);
+      if (matchedNoteInfo) {
+        // Visual feedback for the pressed key
+        const renderKey = hitboxMap.get(hitbox);
+        if (renderKey) {
+          renderKey.material = pressedHighlightMaterial;
+        }
+
+        // Unhighlight ALL notes in this step (both the one pressed and the ones skipped)
+        currentStep.notes.forEach((n) => {
+          if (n.note !== note) {
+            unhighlightKey(n.note);
+          }
+        });
+
+        currentNoteIndex++;
+
+        // Restore the pressed key after its specific duration
+        setTimeout(() => {
+          unhighlightKey(note);
+        }, matchedNoteInfo.duration * 1000);
+
+        // Advance immediately (player only needs to hit one note of the chord)
         advancePlayMode();
-      }, playedNoteInfo.duration * 1000);
+      }
     }
 
     if (playAudio) {
@@ -950,48 +996,51 @@ function playMelodyDemo() {
   console.log("Starting melody demo...");
 
   function playNoteAtIndex(index) {
-    const noteInfo = melody[index];
+    // Each entry in melody is now a Step (group of notes)
+    const step = melody[index];
 
-    // Play sound and highlight
-    if (noteInfo.note !== "_") {
-      const hitbox = noteToHitboxMap.get(noteInfo.note);
-      if (hitbox) {
-        pressKey(hitbox, "demo", false);
-      }
-      highlightKey(noteInfo.note, noteInfo.track);
-      const gainNode = playNote(noteInfo.note);
-      if (gainNode) {
-        demoPlayingNotes.set(noteInfo.note, gainNode);
-      }
-      const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100); // Release key 100ms earlier
-
-      const timeoutId = setTimeout(() => {
-        unhighlightKey(noteInfo.note);
-        if (gainNode) {
-          fadeOutAndDisconnect(gainNode, 1);
-          demoPlayingNotes.delete(noteInfo.note);
-        }
+    // Iterate over all notes in this chord/step
+    step.notes.forEach((noteInfo) => {
+      if (noteInfo.note !== "_") {
+        const hitbox = noteToHitboxMap.get(noteInfo.note);
         if (hitbox) {
-          releaseKey(hitbox, "demo", false);
+          pressKey(hitbox, "demo", false);
         }
-      }, releaseDelay);
-      demoNoteTimeouts.push(timeoutId);
-    }
+        highlightKey(noteInfo.note, noteInfo.track);
+        const gainNode = playNote(noteInfo.note);
+        if (gainNode) {
+          demoPlayingNotes.set(noteInfo.note, gainNode);
+        }
 
-    // Schedule next note
+        const releaseDelay = Math.max(0, noteInfo.duration * 1000 - 100);
+
+        const timeoutId = setTimeout(() => {
+          unhighlightKey(noteInfo.note);
+          if (gainNode) {
+            fadeOutAndDisconnect(gainNode, 1);
+            demoPlayingNotes.delete(noteInfo.note);
+          }
+          if (hitbox) {
+            releaseKey(hitbox, "demo", false);
+          }
+        }, releaseDelay);
+        demoNoteTimeouts.push(timeoutId);
+      }
+    });
+
+    // Schedule next group/step
     if (index + 1 < melody.length) {
-      const nextNoteInfo = melody[index + 1];
-      const delay = (nextNoteInfo.start - noteInfo.start) * 1000;
-
+      const nextStep = melody[index + 1];
+      const delay = (nextStep.time - step.time) * 1000;
       const timeoutId = setTimeout(() => playNoteAtIndex(index + 1), delay);
       demoNoteTimeouts.push(timeoutId);
     } else {
+      // End of song, wait for the duration of the last longest note
+      const maxDuration = Math.max(...step.notes.map((n) => n.duration));
       const timeoutId = setTimeout(() => {
         isDemoPlaying = false;
-
         demoNoteTimeouts = [];
-      }, noteInfo.duration * 1000);
-
+      }, maxDuration * 1000);
       demoNoteTimeouts.push(timeoutId);
     }
   }
@@ -1021,14 +1070,19 @@ async function advancePlayMode() {
     return;
   }
 
-  const noteInfo = melody[currentNoteIndex];
-  if (noteInfo.note === "_") {
-    // Automatically skip rests
-    currentNoteIndex++;
-    setTimeout(advancePlayMode, noteInfo.duration * 1000);
-  } else {
-    highlightKey(noteInfo.note, noteInfo.track);
-  }
+  const step = melody[currentNoteIndex];
+  // Highlight all notes in the current step/chord
+  step.notes.forEach((noteInfo) => {
+    // Note: Implicit rest checks ("_") are generally not needed with grouped MIDI logic,
+    // but handled here if valid data exists.
+    if (noteInfo.note !== "_") {
+      highlightKey(noteInfo.note, noteInfo.track);
+    } else {
+      // If we encounter explicit rests in the future
+      currentNoteIndex++;
+      setTimeout(advancePlayMode, noteInfo.duration * 1000);
+    }
+  });
 }
 
 function highlightKey(noteToHighlight, trackIndex) {
