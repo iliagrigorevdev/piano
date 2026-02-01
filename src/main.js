@@ -157,6 +157,8 @@ transposeControls.innerHTML = `
   <span id="transpose-value">0</span>
   <button id="transpose-up" class="control-btn" disabled>+</button>
 `;
+// Initially hide transpose controls
+transposeControls.style.display = "none";
 controlsRow.appendChild(transposeControls);
 
 const btnTransposeDown = transposeControls.querySelector("#transpose-down");
@@ -360,18 +362,20 @@ function renderMelodyList(melodies) {
         li.classList.remove("selected");
         stopMelodyDemo();
 
-        // Disable transpose controls
+        // Disable transpose controls and hide them
         btnTransposeDown.disabled = true;
         btnTransposeUp.disabled = true;
         displayTranspose.textContent = "0";
+        transposeControls.style.display = "none";
         return;
       }
 
       selectedMelodyFile = melodyItem.file;
 
-      // Enable transpose controls
+      // Enable transpose controls and show them
       btnTransposeDown.disabled = false;
       btnTransposeUp.disabled = false;
+      transposeControls.style.display = "flex";
 
       // Update selection visuals
       ul.querySelectorAll("li").forEach((item) =>
@@ -496,6 +500,7 @@ function showMelodySelection() {
   btnTransposeDown.disabled = true;
   btnTransposeUp.disabled = true;
   displayTranspose.textContent = "0";
+  transposeControls.style.display = "none";
 }
 
 playButton.addEventListener("click", async () => {
