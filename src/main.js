@@ -555,28 +555,29 @@ function pressKey(hitbox, pointerId, playAudio = true) {
       const matchedNoteInfo = currentStep.notes.find((n) => n.note === note);
 
       if (matchedNoteInfo) {
-        // Visual feedback for the pressed key
-        const renderKey = hitboxMap.get(hitbox);
-        if (renderKey) {
-          renderKey.material = pressedHighlightMaterial;
-        }
-
-        // Unhighlight ALL notes in this step (both the one pressed and the ones skipped)
+        // 1. Highlight ALL notes in the chord in Orange
         currentStep.notes.forEach((n) => {
-          if (n.note !== note) {
-            unhighlightKey(n.note);
+          const nHitbox = noteToHitboxMap.get(n.note);
+          if (nHitbox) {
+            const nRenderKey = hitboxMap.get(nHitbox);
+            if (nRenderKey) {
+              nRenderKey.material = pressedHighlightMaterial;
+            }
           }
         });
 
         currentNoteIndex++;
 
-        // Restore the pressed key after its specific duration
+        // 2. Wait for the duration of the note before cleaning up and showing the next step
         setTimeout(() => {
-          unhighlightKey(note);
-        }, matchedNoteInfo.duration * 1000);
+          // Revert ALL notes in the chord to original material
+          currentStep.notes.forEach((n) => {
+            unhighlightKey(n.note);
+          });
 
-        // Advance immediately (player only needs to hit one note of the chord)
-        advancePlayMode();
+          // Show Blue hints for the next step
+          advancePlayMode();
+        }, matchedNoteInfo.duration * 1000);
       }
     }
 
