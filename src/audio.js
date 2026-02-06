@@ -216,4 +216,5 @@ export {
   isAudioReady,
   fadeOutAndDisconnect,
   midiToNoteName,
+  noteNameToMidi,
 };

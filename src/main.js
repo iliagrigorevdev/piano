@@ -9,9 +9,11 @@ import {
   isAudioReady,
   fadeOutAndDisconnect,
   midiToNoteName,
+  noteNameToMidi,
 } from "./audio.js";
 import { Midi } from "@tonejs/midi";
 import { showCongratsEffect } from "./congrats.js";
+import { parseABC } from "./parser";
 
 registerSW();
 
@@ -296,11 +298,39 @@ loadFileInput.addEventListener("change", handleFileSelect);
 
 async function createMelodyList() {
   let melodies = [];
+
+  // Check for melody query parameter (ABC Notation)
+  const urlParams = new URLSearchParams(window.location.search);
+  const abcParam = urlParams.get("melody");
+  const bpmParam = urlParams.get("bpm");
+  let customMelodyObj = null;
+
+  if (abcParam) {
+    try {
+      const abcContent = decodeURIComponent(abcParam);
+      if (abcContent) {
+        customMelodyObj = {
+          file: {
+            isABC: true,
+            content: abcContent,
+            bpm: bpmParam ? parseInt(bpmParam, 10) : null,
+          },
+          description: "Shared Melody",
+          transpose: 0,
+          layout: "1",
+        };
+        melodies.push(customMelodyObj);
+      }
+    } catch (e) {
+      console.warn("Failed to parse melody parameter", e);
+    }
+  }
+
   try {
     const response = await fetch("melodies/melodies.txt");
     if (response.ok) {
       const text = await response.text();
-      melodies = text
+      const fileMelodies = text
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line && !line.startsWith("#"))
@@ -313,6 +343,7 @@ async function createMelodyList() {
             layout: layout ? layout.trim() : null,
           };
         });
+      melodies = [...melodies, ...fileMelodies];
     }
   } catch (e) {
     console.warn("Could not load default melodies list.");
@@ -415,6 +446,51 @@ function renderMelodyList(melodies) {
 }
 
 async function loadMelody(melodySource, transpose = 0) {
+  // Handle ABC String Object
+  if (melodySource && melodySource.isABC) {
+    const rawNotes = parseABC(melodySource.content);
+    // Convert flat ABC notes to the Game's "Step" structure
+    let currentTime = 0;
+    // Assuming 120 BPM for ABC notation without explicit tempo (1 beat = 0.5s)
+    const bpm = melodySource.bpm || 120;
+    const secondsPerBeat = 60 / bpm;
+
+    const newMelody = [];
+
+    rawNotes.forEach((n) => {
+      const noteDurationSeconds = n.duration * secondsPerBeat;
+
+      if (n.id) {
+        let finalNote = n.id;
+
+        // Transposition Logic for ABC Notes
+        if (transpose !== 0) {
+          const midiVal = noteNameToMidi(n.id);
+          if (midiVal !== null) {
+            const transposedMidi = midiVal + transpose;
+            // Convert back to note name using audio.js helper
+            finalNote = midiToNoteName(transposedMidi);
+          }
+        }
+
+        newMelody.push({
+          time: currentTime,
+          notes: [
+            {
+              note: finalNote,
+              duration: noteDurationSeconds,
+              track: 0,
+            },
+          ],
+        });
+      }
+      currentTime += noteDurationSeconds;
+    });
+
+    melody = newMelody;
+    return;
+  }
+
   let midiData;
 
   if (typeof melodySource === "string") {
