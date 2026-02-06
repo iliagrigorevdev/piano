@@ -109,14 +109,20 @@ function updateCamera() {
 function updateTargetHandles() {
   const isPortrait = window.innerHeight > window.innerWidth;
   const z = cameraWaypoints[currentWaypointIndex];
+  // If undefined (e.g. initialization race), fallback to 0
+  const safeZ = z !== undefined ? z : 0;
+
   const lowerChunkY = chunkYPositions[currentWaypointIndex + 1];
-  const cameraHeight = 30 + lowerChunkY;
+  // If undefined, fallback to 0 (happens on single chunk layouts)
+  const safeLowerChunkY = lowerChunkY !== undefined ? lowerChunkY : 0;
+
+  const cameraHeight = 30 + safeLowerChunkY;
   if (isPortrait) {
-    targetCameraPosition.set(-z - 15, cameraHeight, 0);
-    cameraLookAt.set(-z, lowerChunkY, 0);
+    targetCameraPosition.set(-safeZ - 15, cameraHeight, 0);
+    cameraLookAt.set(-safeZ, safeLowerChunkY, 0);
   } else {
-    targetCameraPosition.set(0, cameraHeight, z + 15);
-    cameraLookAt.set(0, lowerChunkY, z);
+    targetCameraPosition.set(0, cameraHeight, safeZ + 15);
+    cameraLookAt.set(0, safeLowerChunkY, safeZ);
   }
 }
 
@@ -137,15 +143,24 @@ melodiesContainer.parentNode.insertBefore(controlsRow, melodiesContainer);
 // -- Layout Selector UI --
 const layoutControls = document.createElement("div");
 layoutControls.id = "layout-controls";
+
+// Determine initial layout for UI checkbox based on shared melody param
+const uiUrlParams = new URLSearchParams(window.location.search);
+const initialUiLayout = uiUrlParams.has("melody") ? "3" : "1";
+
 layoutControls.innerHTML = `
   <span>Layout:</span>
   <label class="radio-label">
-    <input type="radio" name="layout" value="1" checked>
+    <input type="radio" name="layout" value="1" ${initialUiLayout === "1" ? "checked" : ""}>
     Type 1
   </label>
   <label class="radio-label">
-    <input type="radio" name="layout" value="2">
+    <input type="radio" name="layout" value="2" ${initialUiLayout === "2" ? "checked" : ""}>
     Type 2
+  </label>
+  <label class="radio-label">
+    <input type="radio" name="layout" value="3" ${initialUiLayout === "3" ? "checked" : ""}>
+    Type 3
   </label>
 `;
 controlsRow.appendChild(layoutControls);
@@ -317,7 +332,7 @@ async function createMelodyList() {
           },
           description: "Shared Melody",
           transpose: 0,
-          layout: "1",
+          layout: "3", // Use Type 3 (short) layout for shared melodies
         };
         melodies.push(customMelodyObj);
       }
@@ -864,7 +879,11 @@ function onPointerUp(event) {
 }
 
 function initScene(notes) {
-  buildPiano(notes, "1");
+  // Determine if we should start with "Type 3" layout based on shared melody URL param
+  const urlParams = new URLSearchParams(window.location.search);
+  const startLayout = urlParams.get("melody") ? "3" : "1";
+
+  buildPiano(notes, startLayout);
 
   window.addEventListener("resize", onWindowResize, false);
   renderer.domElement.addEventListener("mousedown", onPointerDown, false);
@@ -918,17 +937,36 @@ function buildPiano(notes, layout = "1") {
 
   const chunkStartNotes1 = ["A0", "F1", "F3", "F5", "F7"];
   const chunkStartNotes2 = ["A0", "F2", "F4", "F6"];
-  const chunkStartNotes = layout === "2" ? chunkStartNotes2 : chunkStartNotes1;
+  const chunkStartNotes3 = ["F3"];
+  let chunkStartNotes;
+
+  if (layout === "3") {
+    chunkStartNotes = chunkStartNotes3;
+  } else if (layout === "2") {
+    chunkStartNotes = chunkStartNotes2;
+  } else {
+    chunkStartNotes = chunkStartNotes1;
+  }
+
   const noteChunks = [];
 
   for (let i = 0; i < chunkStartNotes.length; i++) {
     const startNote = chunkStartNotes[i];
-    const endNote =
-      i + 1 < chunkStartNotes.length ? chunkStartNotes[i + 1] : "C8";
-    const startIndex = allNoteNames.indexOf(startNote);
-    let endIndex = allNoteNames.indexOf(endNote);
+    let endNoteString = "C8";
 
-    if (i + 1 < chunkStartNotes.length) {
+    // For Type 3 layout, explicitly end at E5
+    if (layout === "3") {
+      endNoteString = "E5";
+    } else if (i + 1 < chunkStartNotes.length) {
+      endNoteString = chunkStartNotes[i + 1];
+    }
+
+    const startIndex = allNoteNames.indexOf(startNote);
+    let endIndex = allNoteNames.indexOf(endNoteString);
+
+    // If strictly chunking full piano, stop before the next chunk starts.
+    // For "Type 3" layout, we want the end note inclusive, so we don't decrement.
+    if (layout !== "3" && i + 1 < chunkStartNotes.length) {
       endIndex--; // to not include the start of the next chunk
     }
 
@@ -938,12 +976,19 @@ function buildPiano(notes, layout = "1") {
 
   cameraWaypoints = [];
   chunkYPositions = [];
-  const numWaypoints = noteChunks.length - 1;
-  for (let i = 0; i < numWaypoints; i++) {
-    const waypointZ = (i + 0.5 - numWaypoints / 2) * whiteKeyLength;
-    cameraWaypoints.push(waypointZ);
+
+  if (noteChunks.length === 1) {
+    // Single chunk layout (like "Type 3")
+    cameraWaypoints.push(0);
+    currentWaypointIndex = 0;
+  } else {
+    const numWaypoints = noteChunks.length - 1;
+    for (let i = 0; i < numWaypoints; i++) {
+      const waypointZ = (i + 0.5 - numWaypoints / 2) * whiteKeyLength;
+      cameraWaypoints.push(waypointZ);
+    }
+    currentWaypointIndex = Math.floor((numWaypoints - 1) / 2);
   }
-  currentWaypointIndex = Math.floor((numWaypoints - 1) / 2);
 
   const maxWhiteKeys = Math.max(
     ...noteChunks.map((c) => c.filter((n) => !n.includes("#")).length),
