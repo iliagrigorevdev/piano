@@ -146,3 +146,22 @@ canvas {
   border-color: #ffae5e;
   background-color: rgba(255, 174, 94, 0.2);
 }
+
+#credits {
+  position: absolute;
+  bottom: 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: sans-serif;
+  font-size: 0.8rem;
+  text-align: center;
+  width: 100%;
+}
+
+#credits a {
+  color: #ffae5e;
+  text-decoration: none;
+}
+
+#credits a:hover {
+  text-decoration: underline;
+}

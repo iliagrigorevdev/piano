@@ -282,6 +282,13 @@ mainLoadBtn.addEventListener("click", () => {
 btnLoadFiles.addEventListener("click", () => loadFileInput.click());
 btnLoadFolder.addEventListener("click", () => loadFolderInput.click());
 
+// -- Credits --
+const credits = document.createElement("div");
+credits.id = "credits";
+credits.innerHTML =
+  'Audio Samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank">Salamander Grand Piano V3</a> by Alexander Holm (CC BY 3.0)';
+overlay.appendChild(credits);
+
 // 5. Shared File Processing
 const handleFileSelect = (e) => {
   const files = Array.from(e.target.files).filter(
